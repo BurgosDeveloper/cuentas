@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "884038960962",
+    "project_id": "cuentas-bb27f",
+    "storage_bucket": "cuentas-bb27f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:884038960962:android:adb44f7e68ad8e63f42adb",
+        "android_client_info": {
+          "package_name": "com.cuentas.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBfvtPnEMJlV2dlqeud3FQoE_7N-1fw58"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

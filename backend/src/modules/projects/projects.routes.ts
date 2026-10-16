@@ -1,0 +1,58 @@
+import { FastifyPluginAsync } from 'fastify';
+import { ProjectsService } from './projects.service';
+import { CreateProjectSchema, CreateProjectItemSchema, UpdateProjectItemSchema } from '@cuentas/shared';
+
+export const projectsRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.addHook('preHandler', fastify.authenticate);
+
+  fastify.get('/', async (request) => {
+    const userId = (request.user as any).userId;
+    return await ProjectsService.getProjects(userId);
+  });
+
+  fastify.post('/', async (request, reply) => {
+    const userId = (request.user as any).userId;
+    const parsed = CreateProjectSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Datos de proyecto inválidos', details: parsed.error.format() });
+    }
+
+    try {
+      const project = await ProjectsService.createProject(userId, parsed.data);
+      return reply.status(201).send(project);
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
+
+  fastify.post('/items', async (request, reply) => {
+    const userId = (request.user as any).userId;
+    const parsed = CreateProjectItemSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Datos de ítem inválidos', details: parsed.error.format() });
+    }
+
+    try {
+      const item = await ProjectsService.createProjectItem(userId, parsed.data);
+      return reply.status(201).send(item);
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
+
+  fastify.patch('/items/:itemId', async (request, reply) => {
+    const userId = (request.user as any).userId;
+    const { itemId } = request.params as { itemId: string };
+    const parsed = UpdateProjectItemSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Datos de actualización inválidos', details: parsed.error.format() });
+    }
+
+    try {
+      const item = await ProjectsService.updateProjectItem(userId, itemId, parsed.data);
+      return reply.send(item);
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
+};

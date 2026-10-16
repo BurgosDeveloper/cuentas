@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Cuentas",
+    "slug": "cuentas",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#070A12"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cuentas.app"
+    },
+    "android": {
+      "package": "com.cuentas.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#070A12"
+      },
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite a Cuentas autenticarte con FaceID/Biometría"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1B3D81"
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}

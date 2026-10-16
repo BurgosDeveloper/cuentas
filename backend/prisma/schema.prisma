@@ -1,0 +1,174 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Currency {
+  USD
+  VES
+  COP
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model User {
+  id           String            @id @default(uuid())
+  username     String            @unique
+  passwordHash String
+  pinHash      String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  accounts     Account[]
+  transfers    AccountTransfer[]
+  transactions Transaction[]
+  thirds       ThirdParty[]
+  projects     Project[]
+  fcmTokens    FcmToken[]
+  reminders    Reminder[]
+}
+
+model Account {
+  id             String            @id @default(uuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  currency       Currency          @default(USD)
+  balance        Float             @default(0.0)
+  color          String            @default("#1B3D81")
+  icon           String            @default("wallet-outline")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  transactions   Transaction[]
+  transfersFrom  AccountTransfer[] @relation("FromAccount")
+  transfersTo    AccountTransfer[] @relation("ToAccount")
+}
+
+model AccountTransfer {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccountId String
+  fromAccount   Account   @relation("FromAccount", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toAccountId   String
+  toAccount     Account   @relation("ToAccount", fields: [toAccountId], references: [id], onDelete: Cascade)
+  amountFrom    Float
+  amountTo      Float
+  exchangeRate  Float     @default(1.0)
+  note          String?
+  date          DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+}
+
+model ThirdParty {
+  id           String             @id @default(uuid())
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String?
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  transactions Transaction[]
+  splits       TransactionSplit[]
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  color        String        @default("#FFD700")
+  icon         String        @default("briefcase-outline")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  items        ProjectItem[]
+  transactions Transaction[]
+}
+
+model ProjectItem {
+  id          String    @id @default(uuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  amount      Float
+  currency    Currency  @default(USD)
+  isActive    Boolean   @default(false)
+  isCompleted Boolean   @default(false)
+  dueDate     DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Transaction {
+  id             String             @id @default(uuid())
+  userId         String
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  type           TransactionType
+  amountOriginal Float
+  currency       Currency           @default(USD)
+  exchangeRate   Float              @default(1.0)
+  amountUSD      Float
+  accountId      String
+  account        Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  thirdPartyId   String?
+  thirdParty     ThirdParty?        @relation(fields: [thirdPartyId], references: [id], onDelete: SetNull)
+  projectId      String?
+  project        Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  isSettled      Boolean            @default(false)
+  settledAt      DateTime?
+  date           DateTime           @default(now())
+  dueDate        DateTime?
+  note           String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  splits         TransactionSplit[]
+}
+
+model TransactionSplit {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  thirdPartyId  String
+  thirdParty    ThirdParty  @relation(fields: [thirdPartyId], references: [id], onDelete: Cascade)
+  amount        Float
+  note          String?
+  createdAt     DateTime    @default(now())
+}
+
+model FcmToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   @default("android")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Reminder {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  message       String
+  scheduledDate DateTime
+  isSent        Boolean   @default(false)
+  relatedType   String    @default("GENERAL")
+  relatedId     String?
+  createdAt     DateTime  @default(now())
+}
