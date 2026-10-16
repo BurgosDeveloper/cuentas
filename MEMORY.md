@@ -235,6 +235,11 @@ cuentas/
   - OpenJDK: `21.0.6` en `C:\Program Files\Android\Android Studio\jbr`
   - Android SDK: `C:\Users\Burgos\AppData\Local\Android\Sdk`
 
+- **Backend en Producción (Railway):**
+  - Dominio: `https://cuentas-production-7a81.up.railway.app`
+  - Health Endpoint: `https://cuentas-production-7a81.up.railway.app/health`
+  - Repositorio: `https://github.com/BurgosDeveloper/cuentas.git` (Rama `main`)
+
 ---
 
 ## 8. Estado de Entrega & APK Compilado
@@ -250,9 +255,11 @@ cuentas/
 - [x] **Módulo 8: Gráficos Empresariales sin desbordes, Estado de Ánimo Financiero y Billeteras**
 - [x] **Módulo 9: Sincronización Realtime Multi-dispositivo (Socket.io) y Modo Offline de lectura**
 - [x] **Módulo 10: Compilación local de APK Release con Android SDK y Gradle 8.8**
+- [x] **Módulo 11: Selector Dinámico de Servidor (ServerConfigModal) & Producción Railway Integrada**
 
 ### Ubicación del APK Listo para Instalar:
-- **Ruta Directa:** `release/Cuentas-v1.0.0.apk`
+- **Ruta de Entrega Oficial:** `export/Cuentas.apk` (~71.9 MB)
+- **Ruta Versionada:** `export/Cuentas-v1.0.0.apk` (~71.9 MB)
 - **Ruta de Compilación Gradle:** `mobile/android/app/build/outputs/apk/release/app-release.apk`
-- **Tamaño:** ~71.9 MB (Firmado con debug keystore para instalación directa en cualquier dispositivo sin restricciones).
+- **Características:** Conexión directa a Railway, botón de diagnóstico de servidor y selector dinámico de URL.
 
