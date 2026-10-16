@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { AuthService } from './auth.service';
-import { BootstrapMasterSchema, LoginSchema, PinUnlockSchema } from '@cuentas/shared';
+import { BootstrapMasterSchema, LoginSchema, PinUnlockSchema } from '../../shared';
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/status', async () => {

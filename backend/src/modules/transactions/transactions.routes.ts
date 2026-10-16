@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { TransactionsService } from './transactions.service';
-import { CreateTransactionSchema, ToggleSettledSchema, FilterTransactionsSchema } from '@cuentas/shared';
+import { CreateTransactionSchema, ToggleSettledSchema, FilterTransactionsSchema } from '../../shared';
 
 export const transactionsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);

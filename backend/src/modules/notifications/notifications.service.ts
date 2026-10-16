@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { RegisterFcmTokenInput, CreateReminderInput, RealtimeEvents } from '@cuentas/shared';
+import { RegisterFcmTokenInput, CreateReminderInput, RealtimeEvents } from '../../shared';
 import { sendPushNotification } from '../../config/firebase';
 import { emitToUser } from '../../realtime/socket';
 

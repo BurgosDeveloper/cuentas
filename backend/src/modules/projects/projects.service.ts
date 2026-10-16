@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { CreateProjectInput, CreateProjectItemInput, UpdateProjectItemInput, RealtimeEvents } from '@cuentas/shared';
+import { CreateProjectInput, CreateProjectItemInput, UpdateProjectItemInput, RealtimeEvents } from '../../shared';
 import { emitToUser } from '../../realtime/socket';
 
 export class ProjectsService {

@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { ThirdsService } from './thirds.service';
-import { CreateThirdPartySchema } from '@cuentas/shared';
+import { CreateThirdPartySchema } from '../../shared';
 
 export const thirdsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);

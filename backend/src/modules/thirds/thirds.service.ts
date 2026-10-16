@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { CreateThirdPartyInput, RealtimeEvents } from '@cuentas/shared';
+import { CreateThirdPartyInput, RealtimeEvents } from '../../shared';
 import { emitToUser } from '../../realtime/socket';
 
 export class ThirdsService {

@@ -1,6 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { RealtimeEvents, RealtimeEvent } from '@cuentas/shared';
+import { RealtimeEvents, RealtimeEvent } from '../shared';
 
 let io: SocketIOServer | null = null;
 

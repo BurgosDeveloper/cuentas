@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { MoodStatus } from '@cuentas/shared';
+import { MoodStatus } from '../../shared';
 
 export class StatsService {
   static async getDashboardStats(userId: string) {

@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { ProjectsService } from './projects.service';
-import { CreateProjectSchema, CreateProjectItemSchema, UpdateProjectItemSchema } from '@cuentas/shared';
+import { CreateProjectSchema, CreateProjectItemSchema, UpdateProjectItemSchema } from '../../shared';
 
 export const projectsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);

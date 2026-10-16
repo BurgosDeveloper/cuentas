@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { CreateAccountInput, TransferFundsInput, RealtimeEvents } from '@cuentas/shared';
+import { CreateAccountInput, TransferFundsInput, RealtimeEvents } from '../../shared';
 import { emitToUser } from '../../realtime/socket';
 
 export class AccountsService {

@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { NotificationsService } from './notifications.service';
-import { RegisterFcmTokenSchema, CreateReminderSchema } from '@cuentas/shared';
+import { RegisterFcmTokenSchema, CreateReminderSchema } from '../../shared';
 
 export const notificationsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);

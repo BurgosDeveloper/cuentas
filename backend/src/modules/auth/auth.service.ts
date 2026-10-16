@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/prisma';
-import { BootstrapMaster, LoginInput, PinUnlockInput } from '@cuentas/shared';
+import { BootstrapMaster, LoginInput, PinUnlockInput } from '../../shared';
 
 export class AuthService {
   static async getSystemStatus() {

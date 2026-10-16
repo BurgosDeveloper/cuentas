@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { AccountsService } from './accounts.service';
-import { CreateAccountSchema, TransferFundsSchema } from '@cuentas/shared';
+import { CreateAccountSchema, TransferFundsSchema } from '../../shared';
 
 export const accountsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate);
