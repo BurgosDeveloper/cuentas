@@ -239,6 +239,7 @@ cuentas/
   - Dominio: `https://cuentas-production-7a81.up.railway.app`
   - Health Endpoint: `https://cuentas-production-7a81.up.railway.app/health`
   - Repositorio: `https://github.com/BurgosDeveloper/cuentas.git` (Rama `main`)
+  - Railway Project Token: `31b61a6a-5c7b-4b85-87db-02af5b9b9da4` (Token scoped a production)
 
 ---
 
