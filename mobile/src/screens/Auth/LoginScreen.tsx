@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
 import { useAuth } from '../../context/AuthContext';
+import { ServerConfigModal } from '../../components/ServerConfigModal';
 
 interface LoginScreenProps {
   onSwitchToPin?: () => void;
@@ -22,6 +23,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToPin }) => {
   const { login, isLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showServerModal, setShowServerModal] = useState(false);
 
   const handleLogin = async () => {
     if (!username.trim() || !password) {
@@ -103,6 +105,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToPin }) => {
           </TouchableOpacity>
         )}
       </GlassCard>
+
+      <TouchableOpacity
+        style={styles.serverFloatingBtn}
+        onPress={() => setShowServerModal(true)}
+      >
+        <Ionicons name="server-outline" size={14} color={Colors.accentGold} />
+        <Text style={styles.serverFloatingText}>Servidor</Text>
+      </TouchableOpacity>
+
+      <ServerConfigModal
+        visible={showServerModal}
+        onClose={() => setShowServerModal(false)}
+      />
     </View>
   );
 };
@@ -191,5 +206,25 @@ const styles = StyleSheet.create({
     color: Colors.accentGold,
     fontSize: 13,
     fontWeight: '600',
+  },
+  serverFloatingBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(27, 61, 129, 0.4)',
+    borderWidth: 1,
+    borderColor: Colors.borderGlass,
+  },
+  serverFloatingText: {
+    color: Colors.accentGold,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

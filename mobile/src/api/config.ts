@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// URL base predeterminada (IP local detectada de la máquina para pruebas en hardware físico por Wi-Fi)
-export const DEFAULT_API_URL = 'http://192.168.0.118:4000';
+// URL base de produccion en Railway
+export const DEFAULT_API_URL = 'https://cuentas-production-7a81.up.railway.app';
 
 const SERVER_URL_KEY = '@cuentas_server_url';
 

@@ -15,10 +15,12 @@ import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
 import { useAuth } from '../../context/AuthContext';
 import { BootstrapMasterSchema } from '@cuentas/shared';
+import { ServerConfigModal } from '../../components/ServerConfigModal';
 
 export const BootstrapScreen: React.FC = () => {
   const { bootstrap, isLoading } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
+  const [showServerModal, setShowServerModal] = useState(false);
 
   // Paso 1
   const [username, setUsername] = useState('');
@@ -249,6 +251,19 @@ export const BootstrapScreen: React.FC = () => {
           </View>
         )}
       </GlassCard>
+
+      <TouchableOpacity
+        style={styles.serverFloatingBtn}
+        onPress={() => setShowServerModal(true)}
+      >
+        <Ionicons name="server-outline" size={14} color={Colors.accentGold} />
+        <Text style={styles.serverFloatingText}>Servidor</Text>
+      </TouchableOpacity>
+
+      <ServerConfigModal
+        visible={showServerModal}
+        onClose={() => setShowServerModal(false)}
+      />
     </ScrollView>
   );
 };
@@ -380,5 +395,25 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  serverFloatingBtn: {
+    position: 'absolute',
+    top: 30,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(27, 61, 129, 0.4)',
+    borderWidth: 1,
+    borderColor: Colors.borderGlass,
+  },
+  serverFloatingText: {
+    color: Colors.accentGold,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
