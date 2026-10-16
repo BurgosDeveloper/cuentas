@@ -11,11 +11,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
 import { TransferModal } from './TransferModal';
+import { AdjustBalanceModal } from './AdjustBalanceModal';
+import { AuditModal } from '../../components/AuditModal';
 import { useFinancial } from '../../context/FinancialContext';
 
 export const AccountsScreen: React.FC = () => {
   const { accounts, stats, isLoading, refreshAll } = useFinancial();
   const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [selectedAccountForAdjust, setSelectedAccountForAdjust] = useState<any | null>(null);
+  const [auditModalVisible, setAuditModalVisible] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -29,9 +33,19 @@ export const AccountsScreen: React.FC = () => {
           />
         }
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>BILLETERAS & BANCOS</Text>
-          <Text style={styles.headerSubtitle}>Saldos Reales en Custodia</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerTitle}>BILLETERAS & BANCOS</Text>
+            <Text style={styles.headerSubtitle}>Saldos Reales y Ajustes de Caja</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.auditBtn}
+            onPress={() => setAuditModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="shield-checkmark" size={16} color={Colors.accentGold} />
+            <Text style={styles.auditBtnText}>Auditoría</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Resumen por Monedas */}
@@ -78,6 +92,7 @@ export const AccountsScreen: React.FC = () => {
         {/* Lista Detallada de Cuentas */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Cuentas Activas</Text>
+          <Text style={styles.sectionHint}>Toca "Modificar Saldo / 0" con código creador</Text>
         </View>
 
         {accounts.map((acc) => (
@@ -92,7 +107,7 @@ export const AccountsScreen: React.FC = () => {
               </View>
               <View style={styles.accInfo}>
                 <Text style={styles.accName}>{acc.name}</Text>
-                <Text style={styles.accCurrency}>Moneda: {acc.currency}</Text>
+                <Text style={styles.accCurrency}>Moneda Base: {acc.currency}</Text>
               </View>
               <View style={styles.accBalanceWrapper}>
                 <Text style={styles.accBalance}>
@@ -100,6 +115,19 @@ export const AccountsScreen: React.FC = () => {
                   {acc.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                 </Text>
               </View>
+            </View>
+
+            <View style={styles.cardFooter}>
+              <TouchableOpacity
+                style={styles.adjustBalanceBtn}
+                onPress={() => setSelectedAccountForAdjust(acc)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="key-outline" size={14} color={Colors.accentGold} />
+                <Text style={styles.adjustBalanceText}>
+                  Modificar Saldo Base / Poner en 0.00
+                </Text>
+              </TouchableOpacity>
             </View>
           </GlassCard>
         ))}
@@ -109,6 +137,19 @@ export const AccountsScreen: React.FC = () => {
       <TransferModal
         visible={transferModalVisible}
         onClose={() => setTransferModalVisible(false)}
+      />
+
+      {/* Modal Ajustar Saldo Base con Código Único */}
+      <AdjustBalanceModal
+        visible={!!selectedAccountForAdjust}
+        account={selectedAccountForAdjust}
+        onClose={() => setSelectedAccountForAdjust(null)}
+      />
+
+      {/* Modal Bitácora de Auditoría */}
+      <AuditModal
+        visible={auditModalVisible}
+        onClose={() => setAuditModalVisible(false)}
       />
     </View>
   );
@@ -124,7 +165,10 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 40,
   },
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
   headerTitle: {
@@ -137,6 +181,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  auditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 215, 0, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderGold,
+  },
+  auditBtnText: {
+    color: Colors.accentGold,
+    fontSize: 12,
+    fontWeight: '800',
   },
   summaryLabel: {
     fontSize: 12,
@@ -185,6 +245,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 8,
     marginBottom: 10,
   },
@@ -192,6 +255,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  sectionHint: {
+    fontSize: 10,
+    color: Colors.textMuted,
   },
   accountCard: {
     marginVertical: 6,
@@ -229,5 +296,29 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: Colors.textPrimary,
+  },
+  cardFooter: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  adjustBalanceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  adjustBalanceText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.accentGold,
   },
 });

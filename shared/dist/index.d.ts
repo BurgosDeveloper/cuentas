@@ -1,4 +1,6 @@
 import { z } from 'zod';
+export declare const MASTER_CREATOR_CODE = "32362846";
+export declare const MasterCodeSchema: z.ZodEffects<z.ZodString, string, string>;
 export declare const CurrencyEnum: z.ZodEnum<["USD", "VES", "COP"]>;
 export type Currency = z.infer<typeof CurrencyEnum>;
 export declare const TransactionTypeEnum: z.ZodEnum<["INCOME", "EXPENSE"]>;
@@ -103,6 +105,20 @@ export declare const CreateAccountSchema: z.ZodObject<{
     icon?: string | undefined;
 }>;
 export type CreateAccountInput = z.infer<typeof CreateAccountSchema>;
+export declare const AdjustAccountBalanceSchema: z.ZodObject<{
+    balance: z.ZodNumber;
+    reason: z.ZodOptional<z.ZodString>;
+    masterCode: z.ZodEffects<z.ZodString, string, string>;
+}, "strip", z.ZodTypeAny, {
+    balance: number;
+    masterCode: string;
+    reason?: string | undefined;
+}, {
+    balance: number;
+    masterCode: string;
+    reason?: string | undefined;
+}>;
+export type AdjustAccountBalanceInput = z.infer<typeof AdjustAccountBalanceSchema>;
 export declare const TransferFundsSchema: z.ZodObject<{
     fromAccountId: z.ZodString;
     toAccountId: z.ZodString;
@@ -154,6 +170,23 @@ export declare const UpdateThirdPartySchema: z.ZodObject<{
     notes?: string | undefined;
 }>;
 export type UpdateThirdPartyInput = z.infer<typeof UpdateThirdPartySchema>;
+export declare const UpdateThirdPartyWithCodeSchema: z.ZodObject<{
+    name: z.ZodOptional<z.ZodString>;
+    phone: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    notes: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    masterCode: z.ZodEffects<z.ZodString, string, string>;
+}, "strip", z.ZodTypeAny, {
+    masterCode: string;
+    name?: string | undefined;
+    phone?: string | null | undefined;
+    notes?: string | null | undefined;
+}, {
+    masterCode: string;
+    name?: string | undefined;
+    phone?: string | null | undefined;
+    notes?: string | null | undefined;
+}>;
+export type UpdateThirdPartyWithCodeInput = z.infer<typeof UpdateThirdPartyWithCodeSchema>;
 export declare const CreateProjectSchema: z.ZodObject<{
     name: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
@@ -205,8 +238,10 @@ export declare const UpdateProjectItemSchema: z.ZodObject<{
     isCompleted: z.ZodOptional<z.ZodBoolean>;
     dueDate: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     notes: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    masterCode: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     currency?: "USD" | "VES" | "COP" | undefined;
+    masterCode?: string | undefined;
     notes?: string | null | undefined;
     title?: string | undefined;
     amount?: number | undefined;
@@ -215,6 +250,7 @@ export declare const UpdateProjectItemSchema: z.ZodObject<{
     isCompleted?: boolean | undefined;
 }, {
     currency?: "USD" | "VES" | "COP" | undefined;
+    masterCode?: string | undefined;
     notes?: string | null | undefined;
     title?: string | undefined;
     amount?: number | undefined;
@@ -301,6 +337,78 @@ export declare const CreateTransactionSchema: z.ZodObject<{
     }[] | undefined;
 }>;
 export type CreateTransactionInput = z.infer<typeof CreateTransactionSchema>;
+export declare const UpdateTransactionSchema: z.ZodObject<{
+    title: z.ZodOptional<z.ZodString>;
+    type: z.ZodOptional<z.ZodEnum<["INCOME", "EXPENSE"]>>;
+    amountOriginal: z.ZodOptional<z.ZodNumber>;
+    currency: z.ZodOptional<z.ZodEnum<["USD", "VES", "COP"]>>;
+    exchangeRate: z.ZodOptional<z.ZodNumber>;
+    accountId: z.ZodOptional<z.ZodString>;
+    thirdPartyId: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    projectId: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    isSettled: z.ZodOptional<z.ZodBoolean>;
+    note: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+    splits: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        thirdPartyId: z.ZodString;
+        amount: z.ZodNumber;
+        note: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        amount: number;
+        thirdPartyId: string;
+        note?: string | undefined;
+    }, {
+        amount: number;
+        thirdPartyId: string;
+        note?: string | undefined;
+    }>, "many">>;
+    masterCode: z.ZodEffects<z.ZodString, string, string>;
+}, "strip", z.ZodTypeAny, {
+    masterCode: string;
+    type?: "INCOME" | "EXPENSE" | undefined;
+    currency?: "USD" | "VES" | "COP" | undefined;
+    exchangeRate?: number | undefined;
+    note?: string | null | undefined;
+    projectId?: string | null | undefined;
+    title?: string | undefined;
+    thirdPartyId?: string | null | undefined;
+    amountOriginal?: number | undefined;
+    accountId?: string | undefined;
+    isSettled?: boolean | undefined;
+    splits?: {
+        amount: number;
+        thirdPartyId: string;
+        note?: string | undefined;
+    }[] | undefined;
+}, {
+    masterCode: string;
+    type?: "INCOME" | "EXPENSE" | undefined;
+    currency?: "USD" | "VES" | "COP" | undefined;
+    exchangeRate?: number | undefined;
+    note?: string | null | undefined;
+    projectId?: string | null | undefined;
+    title?: string | undefined;
+    thirdPartyId?: string | null | undefined;
+    amountOriginal?: number | undefined;
+    accountId?: string | undefined;
+    isSettled?: boolean | undefined;
+    splits?: {
+        amount: number;
+        thirdPartyId: string;
+        note?: string | undefined;
+    }[] | undefined;
+}>;
+export type UpdateTransactionInput = z.infer<typeof UpdateTransactionSchema>;
+export declare const DeleteWithMasterCodeSchema: z.ZodObject<{
+    masterCode: z.ZodEffects<z.ZodString, string, string>;
+    reason: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    masterCode: string;
+    reason?: string | undefined;
+}, {
+    masterCode: string;
+    reason?: string | undefined;
+}>;
+export type DeleteWithMasterCodeInput = z.infer<typeof DeleteWithMasterCodeSchema>;
 export declare const ToggleSettledSchema: z.ZodObject<{
     isSettled: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
@@ -374,8 +482,11 @@ export declare const RealtimeEvents: {
     readonly ACCOUNT_UPDATED: "account:updated";
     readonly TRANSFER_CREATED: "transfer:created";
     readonly THIRD_UPDATED: "third:updated";
+    readonly THIRD_DELETED: "third:deleted";
     readonly PROJECT_UPDATED: "project:updated";
+    readonly PROJECT_DELETED: "project:deleted";
     readonly PROJECT_ITEM_UPDATED: "project_item:updated";
+    readonly AUDIT_LOG_CREATED: "audit:created";
     readonly DASHBOARD_STATS_UPDATED: "dashboard:stats_updated";
     readonly REMINDER_TRIGGERED: "reminder:triggered";
 };

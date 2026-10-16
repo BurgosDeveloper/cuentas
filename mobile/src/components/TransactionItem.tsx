@@ -7,6 +7,7 @@ import { Colors } from '../theme/colors';
 interface Split {
   id: string;
   amount: number;
+  thirdPartyId?: string;
   thirdParty?: { name: string };
   note?: string;
 }
@@ -22,6 +23,10 @@ interface TransactionItemProps {
     amountUSD: number;
     isSettled: boolean;
     date: string;
+    note?: string | null;
+    accountId?: string;
+    thirdPartyId?: string | null;
+    projectId?: string | null;
     account?: { name: string; color?: string };
     thirdParty?: { name: string };
     project?: { name: string };
@@ -29,13 +34,15 @@ interface TransactionItemProps {
   };
   onToggleSettled: (id: string, currentSettled: boolean) => void;
   onPress?: () => void;
-  onDelete?: (id: string) => void;
+  onEdit?: (transaction: any) => void;
+  onDelete?: (transaction: any) => void;
 }
 
 export const TransactionItem: React.FC<TransactionItemProps> = ({
   transaction,
   onToggleSettled,
   onPress,
+  onEdit,
   onDelete,
 }) => {
   const isIncome = transaction.type === 'INCOME';
@@ -54,6 +61,15 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
           .map((s) => `${s.thirdParty?.name || 'Tercero'} $${s.amount}`)
           .join(' - ')
       : null;
+
+  const formattedDate = (() => {
+    try {
+      const d = new Date(transaction.date);
+      return d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
+    } catch {
+      return '';
+    }
+  })();
 
   return (
     <View
@@ -82,7 +98,7 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
 
       <TouchableOpacity
         style={styles.contentTouch}
-        onPress={onPress}
+        onPress={() => (onEdit ? onEdit(transaction) : onPress?.())}
         activeOpacity={0.8}
       >
         <View style={styles.topRow}>
@@ -121,7 +137,13 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
           </Text>
         ) : null}
 
-        {/* Badges de cuenta y proyecto */}
+        {transaction.note ? (
+          <Text style={styles.noteText} numberOfLines={1}>
+            {transaction.note}
+          </Text>
+        ) : null}
+
+        {/* Badges de cuenta, proyecto y fecha */}
         <View style={styles.bottomRow}>
           <View style={styles.tagsContainer}>
             {transaction.account && (
@@ -138,6 +160,9 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
                 </Text>
               </View>
             )}
+            {formattedDate ? (
+              <Text style={styles.dateBadge}>{formattedDate}</Text>
+            ) : null}
           </View>
 
           {transaction.currency !== 'USD' && (
@@ -148,15 +173,26 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
         </View>
       </TouchableOpacity>
 
-      {onDelete && (
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => onDelete(transaction.id)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="trash-outline" size={16} color={Colors.textMuted} />
-        </TouchableOpacity>
-      )}
+      <View style={styles.actionsColumn}>
+        {onEdit && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => onEdit(transaction)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="create-outline" size={16} color={Colors.accentGold} />
+          </TouchableOpacity>
+        )}
+        {onDelete && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => onDelete(transaction)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -175,7 +211,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
   },
   cardSettled: {
-    opacity: 0.6,
+    opacity: 0.65,
     backgroundColor: 'rgba(7, 10, 18, 0.4)',
   },
   checkboxTouch: {
@@ -236,6 +272,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+  noteText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -244,7 +286,9 @@ const styles = StyleSheet.create({
   },
   tagsContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
+    flexWrap: 'wrap',
   },
   tagBadge: {
     flexDirection: 'row',
@@ -263,12 +307,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '600',
   },
+  dateBadge: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
   equivUsd: {
     fontSize: 11,
     color: Colors.textMuted,
   },
-  deleteButton: {
+  actionsColumn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    gap: 2,
+  },
+  actionButton: {
     padding: 6,
-    marginLeft: 4,
   },
 });

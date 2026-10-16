@@ -6,19 +6,24 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { CuadreSummaryCard } from '../../components/CuadreSummaryCard';
 import { TransactionItem } from '../../components/TransactionItem';
 import { NewTransactionModal } from './NewTransactionModal';
+import { CreatorCodeModal } from '../../components/CreatorCodeModal';
+import { AuditModal } from '../../components/AuditModal';
 import { useFinancial } from '../../context/FinancialContext';
 
 export const CuadreScreen: React.FC = () => {
-  const { transactions, stats, isLoading, refreshAll, toggleSettled, deleteTransaction } = useFinancial();
+  const { transactions, stats, isLoading, refreshAll, toggleSettled, deleteTransaction } =
+    useFinancial();
   const [filter, setFilter] = useState<'pending' | 'settled' | 'all'>('pending');
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [deletingTx, setDeletingTx] = useState<any | null>(null);
+  const [auditModalVisible, setAuditModalVisible] = useState(false);
 
   const filteredTransactions = transactions.filter((t) => {
     if (filter === 'pending') return !t.isSettled;
@@ -26,15 +31,14 @@ export const CuadreScreen: React.FC = () => {
     return true;
   });
 
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      'Eliminar Movimiento',
-      '¿Estás seguro de que deseas eliminar este movimiento? Se revertirá el saldo en la cuenta asociada.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => deleteTransaction(id) },
-      ]
-    );
+  const handleOpenNew = () => {
+    setEditingTx(null);
+    setModalVisible(true);
+  };
+
+  const handleOpenEdit = (tx: any) => {
+    setEditingTx(tx);
+    setModalVisible(true);
   };
 
   return (
@@ -50,9 +54,19 @@ export const CuadreScreen: React.FC = () => {
         }
       >
         {/* Cabecera del Cuadre */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>CUADRE DIARIO</Text>
-          <Text style={styles.headerSubtitle}>Control de Flujo & Liquidación</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerTitle}>CUADRE DIARIO</Text>
+            <Text style={styles.headerSubtitle}>Control de Flujo, Edición & Auditoría</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.auditBtn}
+            onPress={() => setAuditModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="shield-checkmark" size={16} color={Colors.accentGold} />
+            <Text style={styles.auditBtnText}>Bitácora</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Resumen Superior */}
@@ -134,7 +148,8 @@ export const CuadreScreen: React.FC = () => {
                 key={tx.id}
                 transaction={tx}
                 onToggleSettled={toggleSettled}
-                onDelete={handleDelete}
+                onEdit={handleOpenEdit}
+                onDelete={(item) => setDeletingTx(item)}
               />
             ))
           )}
@@ -144,16 +159,47 @@ export const CuadreScreen: React.FC = () => {
       {/* Botón Flotante Agregar Movimiento (FAB) */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => setModalVisible(true)}
+        onPress={handleOpenNew}
         activeOpacity={0.8}
       >
         <Ionicons name="add" size={28} color={Colors.bgDark} />
       </TouchableOpacity>
 
-      {/* Modal Nuevo Movimiento */}
+      {/* Modal Nuevo / Editar Movimiento */}
       <NewTransactionModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        editingTransaction={editingTx}
+        onClose={() => {
+          setModalVisible(false);
+          setEditingTx(null);
+        }}
+      />
+
+      {/* Modal Eliminar con Código Único de Programador */}
+      <CreatorCodeModal
+        visible={!!deletingTx}
+        title="Eliminar Movimiento"
+        subtitle={
+          deletingTx
+            ? `Se eliminará "${deletingTx.title}" ($${deletingTx.amountOriginal.toFixed(
+                2
+              )} ${deletingTx.currency}), se revertirá el saldo en la cuenta y quedará guardado en la Papelera de Auditoría BD.`
+            : ''
+        }
+        actionLabel="Confirmar Eliminación"
+        isDestructive
+        onClose={() => setDeletingTx(null)}
+        onConfirm={async (masterCode, reason) => {
+          if (deletingTx) {
+            await deleteTransaction(deletingTx.id, masterCode, reason);
+          }
+        }}
+      />
+
+      {/* Modal Bitácora de Auditoría */}
+      <AuditModal
+        visible={auditModalVisible}
+        onClose={() => setAuditModalVisible(false)}
       />
     </View>
   );
@@ -169,7 +215,10 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 90,
   },
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 14,
   },
   headerTitle: {
@@ -182,6 +231,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  auditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 215, 0, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderGold,
+  },
+  auditBtnText: {
+    color: Colors.accentGold,
+    fontSize: 12,
+    fontWeight: '800',
   },
   segmentContainer: {
     flexDirection: 'row',

@@ -10,6 +10,7 @@ import { thirdsRoutes } from './modules/thirds/thirds.routes';
 import { projectsRoutes } from './modules/projects/projects.routes';
 import { statsRoutes } from './modules/stats/stats.routes';
 import { notificationsRoutes } from './modules/notifications/notifications.routes';
+import { auditRoutes } from './modules/audit/audit.routes';
 import { NotificationsService } from './modules/notifications/notifications.service';
 
 const fastify = Fastify({
@@ -51,6 +52,7 @@ async function main() {
   await fastify.register(projectsRoutes, { prefix: '/api/projects' });
   await fastify.register(statsRoutes, { prefix: '/api/stats' });
   await fastify.register(notificationsRoutes, { prefix: '/api/notifications' });
+  await fastify.register(auditRoutes, { prefix: '/api/audit' });
 
   // 5. Inicializar servidor HTTP
   await fastify.ready();

@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma';
-import { CreateThirdPartyInput, RealtimeEvents } from '../../shared';
+import { CreateThirdPartyInput, UpdateThirdPartyWithCodeInput, RealtimeEvents } from '../../shared';
 import { emitToUser } from '../../realtime/socket';
+import { AuditService } from '../audit/audit.service';
 
 export class ThirdsService {
   static async getThirds(userId: string) {
@@ -8,7 +9,7 @@ export class ThirdsService {
       where: { userId },
       include: {
         transactions: {
-          where: { isSettled: false },
+          where: { isSettled: false, isDeleted: false },
           select: {
             id: true,
             type: true,
@@ -18,7 +19,7 @@ export class ThirdsService {
         },
         splits: {
           where: {
-            transaction: { isSettled: false },
+            transaction: { isSettled: false, isDeleted: false },
           },
           select: {
             id: true,
@@ -87,15 +88,74 @@ export class ThirdsService {
     return third;
   }
 
+  static async updateThird(userId: string, thirdId: string, data: UpdateThirdPartyWithCodeInput) {
+    const existing = await prisma.thirdParty.findFirst({
+      where: { id: thirdId, userId },
+    });
+    if (!existing) {
+      throw new Error('Tercero no encontrado.');
+    }
+
+    const updated = await prisma.thirdParty.update({
+      where: { id: thirdId },
+      data: {
+        name: data.name !== undefined ? data.name.trim() : existing.name,
+        phone: data.phone !== undefined ? (data.phone?.trim() || null) : existing.phone,
+        notes: data.notes !== undefined ? (data.notes?.trim() || null) : existing.notes,
+      },
+    });
+
+    await AuditService.log({
+      userId,
+      action: 'UPDATE',
+      entity: 'THIRD_PARTY',
+      entityId: thirdId,
+      description: `Tercero editado: "${existing.name}" → "${updated.name}"`,
+      previousData: { name: existing.name, phone: existing.phone, notes: existing.notes },
+      newData: { name: updated.name, phone: updated.phone, notes: updated.notes },
+    });
+
+    emitToUser(userId, RealtimeEvents.THIRD_UPDATED, { third: updated, action: 'updated' });
+    return updated;
+  }
+
+  static async deleteThird(userId: string, thirdId: string, reason?: string) {
+    const existing = await prisma.thirdParty.findFirst({
+      where: { id: thirdId, userId },
+    });
+    if (!existing) {
+      throw new Error('Tercero no encontrado.');
+    }
+
+    await prisma.thirdParty.delete({
+      where: { id: thirdId },
+    });
+
+    await AuditService.log({
+      userId,
+      action: 'DELETE',
+      entity: 'THIRD_PARTY',
+      entityId: thirdId,
+      description: `Tercero eliminado: "${existing.name}"${reason ? ` — Motivo: ${reason}` : ''}`,
+      previousData: existing,
+    });
+
+    emitToUser(userId, RealtimeEvents.THIRD_DELETED, { id: thirdId });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+    return { deleted: true, id: thirdId };
+  }
+
   static async getThirdStatement(userId: string, thirdId: string) {
     const third = await prisma.thirdParty.findFirst({
       where: { id: thirdId, userId },
       include: {
         transactions: {
+          where: { isDeleted: false },
           orderBy: { date: 'desc' },
           include: { account: true },
         },
         splits: {
+          where: { transaction: { isDeleted: false } },
           include: {
             transaction: {
               include: { account: true },

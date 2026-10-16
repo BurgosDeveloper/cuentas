@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { CreateProjectInput, CreateProjectItemInput, UpdateProjectItemInput, RealtimeEvents } from '../../shared';
 import { emitToUser } from '../../realtime/socket';
+import { AuditService } from '../audit/audit.service';
 
 export class ProjectsService {
   static async getProjects(userId: string) {
@@ -45,6 +46,33 @@ export class ProjectsService {
 
     emitToUser(userId, RealtimeEvents.PROJECT_UPDATED, { project, action: 'created' });
     return project;
+  }
+
+  static async deleteProject(userId: string, projectId: string, reason?: string) {
+    const existing = await prisma.project.findFirst({
+      where: { id: projectId, userId },
+      include: { items: true },
+    });
+    if (!existing) {
+      throw new Error('Proyecto no encontrado.');
+    }
+
+    await prisma.project.delete({
+      where: { id: projectId },
+    });
+
+    await AuditService.log({
+      userId,
+      action: 'DELETE',
+      entity: 'PROJECT',
+      entityId: projectId,
+      description: `Proyecto eliminado: "${existing.name}" (${existing.items.length} ítems)${reason ? ` — Motivo: ${reason}` : ''}`,
+      previousData: existing,
+    });
+
+    emitToUser(userId, RealtimeEvents.PROJECT_DELETED, { id: projectId });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+    return { deleted: true, id: projectId };
   }
 
   static async createProjectItem(userId: string, data: CreateProjectItemInput) {
@@ -103,4 +131,37 @@ export class ProjectsService {
 
     return updated;
   }
+
+  static async deleteProjectItem(userId: string, itemId: string, reason?: string) {
+    const item = await prisma.projectItem.findFirst({
+      where: {
+        id: itemId,
+        project: { userId },
+      },
+      include: { project: true },
+    });
+
+    if (!item) {
+      throw new Error('Ítem de proyecto no encontrado.');
+    }
+
+    await prisma.projectItem.delete({
+      where: { id: itemId },
+    });
+
+    await AuditService.log({
+      userId,
+      action: 'DELETE',
+      entity: 'PROJECT_ITEM',
+      entityId: itemId,
+      description: `Ítem de proyecto eliminado: "${item.title}" ($${item.amount.toFixed(2)}) del proyecto "${item.project.name}"${reason ? ` — Motivo: ${reason}` : ''}`,
+      previousData: item,
+    });
+
+    emitToUser(userId, RealtimeEvents.PROJECT_ITEM_UPDATED, { item, action: 'deleted' });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+
+    return { deleted: true, id: itemId };
+  }
 }
+

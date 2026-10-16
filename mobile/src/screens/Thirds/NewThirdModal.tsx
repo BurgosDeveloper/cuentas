@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,24 +9,72 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '../../theme/colors';
 import { useFinancial } from '../../context/FinancialContext';
-import { CreateThirdPartySchema } from '@cuentas/shared';
+import { CreateThirdPartySchema, MASTER_CREATOR_CODE } from '@cuentas/shared';
 
 interface NewThirdModalProps {
   visible: boolean;
+  editingThird?: any | null;
   onClose: () => void;
 }
 
-export const NewThirdModal: React.FC<NewThirdModalProps> = ({ visible, onClose }) => {
-  const { createThird } = useFinancial();
+export const NewThirdModal: React.FC<NewThirdModalProps> = ({
+  visible,
+  editingThird = null,
+  onClose,
+}) => {
+  const { createThird, updateThird } = useFinancial();
+  const isEditing = !!editingThird;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [masterCode, setMasterCode] = useState('');
+
+  useEffect(() => {
+    if (!visible) return;
+    if (editingThird) {
+      setName(editingThird.name || '');
+      setPhone(editingThird.phone || '');
+      setNotes(editingThird.notes || '');
+      setMasterCode('');
+    } else {
+      setName('');
+      setPhone('');
+      setNotes('');
+      setMasterCode('');
+    }
+  }, [visible, editingThird]);
 
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Validación', 'El nombre del tercero es obligatorio.');
+      return;
+    }
+
+    if (isEditing) {
+      if (masterCode.trim() !== MASTER_CREATOR_CODE) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          'Código Requerido',
+          'Debes ingresar el código único de programador para editar un tercero.'
+        );
+        return;
+      }
+
+      try {
+        await updateThird(editingThird.id, {
+          name: name.trim(),
+          phone: phone.trim() || null,
+          notes: notes.trim() || null,
+          masterCode: masterCode.trim(),
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onClose();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'No se pudo actualizar el tercero');
+      }
       return;
     }
 
@@ -44,9 +92,6 @@ export const NewThirdModal: React.FC<NewThirdModalProps> = ({ visible, onClose }
 
     try {
       await createThird(payload);
-      setName('');
-      setPhone('');
-      setNotes('');
       onClose();
     } catch (err: any) {
       Alert.alert('Error', err.message || 'No se pudo guardar el tercero');
@@ -58,7 +103,9 @@ export const NewThirdModal: React.FC<NewThirdModalProps> = ({ visible, onClose }
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Nuevo Tercero / Contacto</Text>
+            <Text style={styles.modalTitle}>
+              {isEditing ? 'Editar Tercero / Contacto' : 'Nuevo Tercero / Contacto'}
+            </Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
@@ -98,9 +145,32 @@ export const NewThirdModal: React.FC<NewThirdModalProps> = ({ visible, onClose }
             />
           </View>
 
+          {isEditing && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: Colors.accentGold }]}>
+                Código Único de Programador
+              </Text>
+              <TextInput
+                style={[styles.input, { borderColor: Colors.accentGold, color: Colors.accentGold, fontWeight: '800' }]}
+                placeholder="Código de creador..."
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="number-pad"
+                secureTextEntry
+                value={masterCode}
+                onChangeText={setMasterCode}
+              />
+            </View>
+          )}
+
           <TouchableOpacity style={styles.primaryButton} onPress={handleSave} activeOpacity={0.8}>
-            <Text style={styles.primaryButtonText}>Guardar Tercero</Text>
-            <Ionicons name="person-add-outline" size={18} color={Colors.bgDark} />
+            <Text style={styles.primaryButtonText}>
+              {isEditing ? 'Autorizar y Guardar Cambios' : 'Guardar Tercero'}
+            </Text>
+            <Ionicons
+              name={isEditing ? 'shield-checkmark' : 'person-add-outline'}
+              size={18}
+              color={Colors.bgDark}
+            />
           </TouchableOpacity>
         </View>
       </View>

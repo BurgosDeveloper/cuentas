@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,33 +8,91 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '../../theme/colors';
 import { useFinancial } from '../../context/FinancialContext';
-import { CreateTransactionSchema } from '@cuentas/shared';
+import { CreateTransactionSchema, UpdateTransactionSchema, MASTER_CREATOR_CODE } from '@cuentas/shared';
 
 interface NewTransactionModalProps {
   visible: boolean;
+  editingTransaction?: any | null;
   onClose: () => void;
 }
 
-export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visible, onClose }) => {
-  const { accounts, thirds, projects, createTransaction } = useFinancial();
+export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
+  visible,
+  editingTransaction = null,
+  onClose,
+}) => {
+  const { accounts, thirds, projects, createTransaction, updateTransaction } = useFinancial();
+  const isEditing = !!editingTransaction;
 
   const [type, setType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'VES' | 'COP'>('USD');
   const [exchangeRate, setExchangeRate] = useState('1');
-  const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedThirdId, setSelectedThirdId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isSettled, setIsSettled] = useState(false);
   const [note, setNote] = useState('');
+  const [masterCode, setMasterCode] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Splits dinámicos (ej. Servidor = 30$ -> arow 25 - basilico 5)
   const [splits, setSplits] = useState<Array<{ thirdPartyId: string; amount: string; note: string }>>([]);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (editingTransaction) {
+      setType(editingTransaction.type || 'EXPENSE');
+      setTitle(editingTransaction.title || '');
+      setAmount(String(editingTransaction.amountOriginal ?? ''));
+      setCurrency(editingTransaction.currency || 'USD');
+      setExchangeRate(String(editingTransaction.exchangeRate ?? '1'));
+      setSelectedAccountId(editingTransaction.accountId || accounts[0]?.id || '');
+      setSelectedThirdId(editingTransaction.thirdPartyId || null);
+      setSelectedProjectId(editingTransaction.projectId || null);
+      setIsSettled(!!editingTransaction.isSettled);
+      setNote(editingTransaction.note || '');
+      setMasterCode('');
+      if (Array.isArray(editingTransaction.splits) && editingTransaction.splits.length > 0) {
+        setSplits(
+          editingTransaction.splits.map((s: any) => ({
+            thirdPartyId: s.thirdPartyId || s.thirdParty?.id || thirds[0]?.id || '',
+            amount: String(s.amount ?? ''),
+            note: s.note || '',
+          }))
+        );
+      } else {
+        setSplits([]);
+      }
+    } else {
+      setType('EXPENSE');
+      setTitle('');
+      setAmount('');
+      setCurrency('USD');
+      setExchangeRate('1');
+      setSelectedAccountId(accounts[0]?.id || '');
+      setSelectedThirdId(null);
+      setSelectedProjectId(null);
+      setIsSettled(false);
+      setNote('');
+      setMasterCode('');
+      setSplits([]);
+    }
+  }, [visible, editingTransaction, accounts, thirds]);
+
+  const handleCurrencyChange = (curr: 'USD' | 'VES' | 'COP') => {
+    setCurrency(curr);
+    if (curr === 'USD') {
+      setExchangeRate('1');
+    }
+  };
 
   const addSplit = () => {
     if (thirds.length === 0) {
@@ -56,7 +114,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
 
   const handleSave = async () => {
     const parsedAmount = parseFloat(amount);
-    const parsedRate = parseFloat(exchangeRate) || 1.0;
+    const parsedRate = currency === 'USD' ? 1.0 : parseFloat(exchangeRate) || 1.0;
 
     if (!title.trim()) {
       Alert.alert('Validación', 'El concepto es obligatorio.');
@@ -66,18 +124,20 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
       Alert.alert('Validación', 'El monto debe ser mayor a 0.');
       return;
     }
-    if (!selectedAccountId && accounts.length > 0) {
-      setSelectedAccountId(accounts[0].id);
+    const finalAccountId = selectedAccountId || accounts[0]?.id;
+    if (!finalAccountId) {
+      Alert.alert('Validación', 'Debes seleccionar una cuenta financiera.');
+      return;
     }
 
-    const payload = {
+    const basePayload = {
       title: title.trim(),
       type,
       amountOriginal: parsedAmount,
       currency,
       exchangeRate: parsedRate,
-      accountId: selectedAccountId || accounts[0]?.id,
-      thirdPartyId: selectedThirdId || null,
+      accountId: finalAccountId,
+      thirdPartyId: splits.length > 0 ? null : selectedThirdId || null,
       projectId: selectedProjectId || null,
       isSettled,
       note: note.trim() || null,
@@ -90,22 +150,54 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
         })),
     };
 
-    const validation = CreateTransactionSchema.safeParse(payload);
-    if (!validation.success) {
-      Alert.alert('Error', validation.error.errors[0]?.message || 'Datos inválidos');
-      return;
-    }
+    if (isEditing) {
+      if (masterCode.trim() !== MASTER_CREATOR_CODE) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          'Código de Creador Requerido',
+          'Para editar un registro existente debes ingresar el código único de programador.'
+        );
+        return;
+      }
 
-    try {
-      await createTransaction(payload);
-      // Reset
-      setTitle('');
-      setAmount('');
-      setSplits([]);
-      setNote('');
-      onClose();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'No se pudo guardar');
+      const editPayload = {
+        ...basePayload,
+        masterCode: masterCode.trim(),
+      };
+
+      const validation = UpdateTransactionSchema.safeParse(editPayload);
+      if (!validation.success) {
+        Alert.alert('Error', validation.error.errors[0]?.message || 'Datos inválidos');
+        return;
+      }
+
+      setSaving(true);
+      try {
+        await updateTransaction(editingTransaction.id, editPayload);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onClose();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'No se pudo actualizar el movimiento');
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      const validation = CreateTransactionSchema.safeParse(basePayload);
+      if (!validation.success) {
+        Alert.alert('Error', validation.error.errors[0]?.message || 'Datos inválidos');
+        return;
+      }
+
+      setSaving(true);
+      try {
+        await createTransaction(basePayload);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onClose();
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'No se pudo guardar');
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -114,8 +206,17 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Nuevo Movimiento</Text>
-            <TouchableOpacity onPress={onClose}>
+            <View>
+              <Text style={styles.modalTitle}>
+                {isEditing ? 'Editar Movimiento' : 'Nuevo Movimiento'}
+              </Text>
+              {isEditing && (
+                <Text style={styles.modalSubtitle}>
+                  Protegido por Código Único de Creador • Auditoría BD
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={onClose} disabled={saving}>
               <Ionicons name="close" size={24} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -204,7 +305,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
                         styles.currPill,
                         currency === curr && styles.currPillActive,
                       ]}
-                      onPress={() => setCurrency(curr)}
+                      onPress={() => handleCurrencyChange(curr)}
                     >
                       <Text
                         style={[
@@ -306,7 +407,14 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
                           ]}
                           onPress={() => updateSplit(idx, 'thirdPartyId', t.id)}
                         >
-                          <Text style={styles.splitThirdText}>{t.name}</Text>
+                          <Text
+                            style={[
+                              styles.splitThirdText,
+                              s.thirdPartyId === t.id && { color: Colors.bgDark, fontWeight: '800' },
+                            ]}
+                          >
+                            {t.name}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -353,6 +461,18 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
               </View>
             )}
 
+            {/* Nota / Observación */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nota / Observación (Opcional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Detalle adicional o referencia..."
+                placeholderTextColor={Colors.textMuted}
+                value={note}
+                onChangeText={setNote}
+              />
+            </View>
+
             {/* Estado inicial */}
             <TouchableOpacity
               style={styles.settledToggleRow}
@@ -374,9 +494,47 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-              <Text style={styles.saveBtnText}>Guardar Movimiento</Text>
-              <Ionicons name="save-outline" size={18} color={Colors.bgDark} />
+            {/* Si está editando, pedir el código único de programador */}
+            {isEditing && (
+              <View style={styles.masterCodeBox}>
+                <View style={styles.masterCodeHeader}>
+                  <Ionicons name="key" size={16} color={Colors.accentGold} />
+                  <Text style={styles.masterCodeLabel}>
+                    Código Único de Programador (Obligatorio para Editar)
+                  </Text>
+                </View>
+                <TextInput
+                  style={styles.masterCodeInput}
+                  placeholder="Ingresa el código de creador..."
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                  value={masterCode}
+                  onChangeText={setMasterCode}
+                />
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              disabled={saving}
+              activeOpacity={0.8}
+            >
+              {saving ? (
+                <ActivityIndicator color={Colors.bgDark} />
+              ) : (
+                <>
+                  <Text style={styles.saveBtnText}>
+                    {isEditing ? 'Autorizar y Guardar Cambios' : 'Guardar Movimiento'}
+                  </Text>
+                  <Ionicons
+                    name={isEditing ? 'shield-checkmark' : 'save-outline'}
+                    size={18}
+                    color={Colors.bgDark}
+                  />
+                </>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -388,7 +546,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({ visibl
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: 'rgba(0,0,0,0.78)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
@@ -397,19 +555,24 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     borderTopWidth: 1.2,
     borderColor: Colors.borderGlass,
-    maxHeight: '90%',
+    maxHeight: '92%',
     padding: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: Colors.accentGold,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   formScroll: {
     marginBottom: 20,
@@ -598,6 +761,37 @@ const styles = StyleSheet.create({
   settledSubtitle: {
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  masterCodeBox: {
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: Colors.borderGold,
+    padding: 12,
+    marginVertical: 8,
+  },
+  masterCodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  masterCodeLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.accentGold,
+  },
+  masterCodeInput: {
+    backgroundColor: 'rgba(7, 10, 18, 0.85)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accentGold,
+    color: Colors.accentGold,
+    paddingHorizontal: 12,
+    height: 44,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 4,
   },
   saveBtn: {
     flexDirection: 'row',

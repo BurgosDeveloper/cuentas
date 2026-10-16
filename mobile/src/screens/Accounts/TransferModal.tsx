@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -26,6 +26,13 @@ export const TransferModal: React.FC<TransferModalProps> = ({ visible, onClose }
   const [amountFrom, setAmountFrom] = useState('');
   const [exchangeRate, setExchangeRate] = useState('1.0');
   const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (visible && accounts.length > 0) {
+      if (!fromAccountId) setFromAccountId(accounts[0]?.id || '');
+      if (!toAccountId) setToAccountId(accounts[1]?.id || accounts[0]?.id || '');
+    }
+  }, [visible, accounts, fromAccountId, toAccountId]);
 
   const parsedAmount = parseFloat(amountFrom) || 0;
   const parsedRate = parseFloat(exchangeRate) || 1.0;

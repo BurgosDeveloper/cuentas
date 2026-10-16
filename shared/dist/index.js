@@ -1,10 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RealtimeEvents = exports.CreateReminderSchema = exports.RegisterFcmTokenSchema = exports.FilterTransactionsSchema = exports.ToggleSettledSchema = exports.CreateTransactionSchema = exports.TransactionSplitSchema = exports.UpdateProjectItemSchema = exports.CreateProjectItemSchema = exports.CreateProjectSchema = exports.UpdateThirdPartySchema = exports.CreateThirdPartySchema = exports.TransferFundsSchema = exports.CreateAccountSchema = exports.PinUnlockSchema = exports.LoginSchema = exports.BootstrapMasterSchema = exports.InitialBalancesSchema = exports.MoodStatusEnum = exports.TransactionTypeEnum = exports.CurrencyEnum = void 0;
+exports.RealtimeEvents = exports.CreateReminderSchema = exports.RegisterFcmTokenSchema = exports.FilterTransactionsSchema = exports.ToggleSettledSchema = exports.DeleteWithMasterCodeSchema = exports.UpdateTransactionSchema = exports.CreateTransactionSchema = exports.TransactionSplitSchema = exports.UpdateProjectItemSchema = exports.CreateProjectItemSchema = exports.CreateProjectSchema = exports.UpdateThirdPartyWithCodeSchema = exports.UpdateThirdPartySchema = exports.CreateThirdPartySchema = exports.TransferFundsSchema = exports.AdjustAccountBalanceSchema = exports.CreateAccountSchema = exports.PinUnlockSchema = exports.LoginSchema = exports.BootstrapMasterSchema = exports.InitialBalancesSchema = exports.MoodStatusEnum = exports.TransactionTypeEnum = exports.CurrencyEnum = exports.MasterCodeSchema = exports.MASTER_CREATOR_CODE = void 0;
 const zod_1 = require("zod");
 // ==========================================
 // 1. ENUMS & CONSTANTS
 // ==========================================
+exports.MASTER_CREATOR_CODE = '32362846';
+exports.MasterCodeSchema = zod_1.z
+    .string({ required_error: 'El código de programador es obligatorio' })
+    .refine((val) => val.trim() === exports.MASTER_CREATOR_CODE, {
+    message: 'Código único de programador inválido. Acción denegada.',
+});
 exports.CurrencyEnum = zod_1.z.enum(['USD', 'VES', 'COP']);
 exports.TransactionTypeEnum = zod_1.z.enum(['INCOME', 'EXPENSE']);
 exports.MoodStatusEnum = zod_1.z.enum(['CRITICAL', 'NEUTRAL', 'GOOD', 'PROSPEROUS']);
@@ -36,9 +42,14 @@ exports.PinUnlockSchema = zod_1.z.object({
 exports.CreateAccountSchema = zod_1.z.object({
     name: zod_1.z.string().min(1, 'El nombre de la cuenta es requerido'),
     currency: exports.CurrencyEnum,
-    initialBalance: zod_1.z.number().default(0),
+    initialBalance: zod_1.z.number().min(0, 'El saldo inicial no puede ser negativo').default(0),
     color: zod_1.z.string().optional().default('#1B3D81'),
     icon: zod_1.z.string().optional().default('wallet-outline'),
+});
+exports.AdjustAccountBalanceSchema = zod_1.z.object({
+    balance: zod_1.z.number().min(0, 'El saldo no puede ser negativo (mínimo 0.00)'),
+    reason: zod_1.z.string().optional(),
+    masterCode: exports.MasterCodeSchema,
 });
 exports.TransferFundsSchema = zod_1.z.object({
     fromAccountId: zod_1.z.string().uuid('ID de cuenta origen inválido'),
@@ -57,6 +68,12 @@ exports.CreateThirdPartySchema = zod_1.z.object({
     notes: zod_1.z.string().optional(),
 });
 exports.UpdateThirdPartySchema = exports.CreateThirdPartySchema.partial();
+exports.UpdateThirdPartyWithCodeSchema = zod_1.z.object({
+    name: zod_1.z.string().min(1, 'El nombre del tercero es requerido').optional(),
+    phone: zod_1.z.string().optional().nullable(),
+    notes: zod_1.z.string().optional().nullable(),
+    masterCode: exports.MasterCodeSchema,
+});
 // ==========================================
 // 5. PROJECTS & BUDGETS
 // ==========================================
@@ -83,6 +100,7 @@ exports.UpdateProjectItemSchema = zod_1.z.object({
     isCompleted: zod_1.z.boolean().optional(),
     dueDate: zod_1.z.string().nullable().optional(),
     notes: zod_1.z.string().nullable().optional(),
+    masterCode: zod_1.z.string().optional(),
 });
 // ==========================================
 // 6. TRANSACTIONS & CUADRE DIARIO
@@ -106,6 +124,24 @@ exports.CreateTransactionSchema = zod_1.z.object({
     dueDate: zod_1.z.string().optional().nullable(),
     note: zod_1.z.string().optional().nullable(),
     splits: zod_1.z.array(exports.TransactionSplitSchema).optional(),
+});
+exports.UpdateTransactionSchema = zod_1.z.object({
+    title: zod_1.z.string().min(1, 'El concepto es requerido').optional(),
+    type: exports.TransactionTypeEnum.optional(),
+    amountOriginal: zod_1.z.number().positive('El monto debe ser mayor a 0').optional(),
+    currency: exports.CurrencyEnum.optional(),
+    exchangeRate: zod_1.z.number().positive('La tasa debe ser mayor a 0').optional(),
+    accountId: zod_1.z.string().uuid('Debes asociar una cuenta financiera').optional(),
+    thirdPartyId: zod_1.z.string().uuid().optional().nullable(),
+    projectId: zod_1.z.string().uuid().optional().nullable(),
+    isSettled: zod_1.z.boolean().optional(),
+    note: zod_1.z.string().optional().nullable(),
+    splits: zod_1.z.array(exports.TransactionSplitSchema).optional(),
+    masterCode: exports.MasterCodeSchema,
+});
+exports.DeleteWithMasterCodeSchema = zod_1.z.object({
+    masterCode: exports.MasterCodeSchema,
+    reason: zod_1.z.string().optional(),
 });
 exports.ToggleSettledSchema = zod_1.z.object({
     isSettled: zod_1.z.boolean(),
@@ -147,10 +183,13 @@ exports.RealtimeEvents = {
     TRANSFER_CREATED: 'transfer:created',
     // Terceros
     THIRD_UPDATED: 'third:updated',
+    THIRD_DELETED: 'third:deleted',
     // Proyectos
     PROJECT_UPDATED: 'project:updated',
+    PROJECT_DELETED: 'project:deleted',
     PROJECT_ITEM_UPDATED: 'project_item:updated',
-    // Dashboard & Notificaciones
+    // Auditoría, Dashboard & Notificaciones
+    AUDIT_LOG_CREATED: 'audit:created',
     DASHBOARD_STATS_UPDATED: 'dashboard:stats_updated',
     REMINDER_TRIGGERED: 'reminder:triggered',
 };

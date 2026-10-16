@@ -12,13 +12,26 @@ import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
 import { NewProjectModal } from './NewProjectModal';
 import { NewProjectItemModal } from './NewProjectItemModal';
+import { CreatorCodeModal } from '../../components/CreatorCodeModal';
 import { useFinancial } from '../../context/FinancialContext';
 
 export const ProjectsScreen: React.FC = () => {
-  const { projects, isLoading, refreshAll, updateProjectItem } = useFinancial();
+  const {
+    projects,
+    isLoading,
+    refreshAll,
+    updateProjectItem,
+    deleteProject,
+    deleteProjectItem,
+  } = useFinancial();
   const [projectModalVisible, setProjectModalVisible] = useState(false);
   const [itemModalVisible, setItemModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'project' | 'item';
+    id: string;
+    title: string;
+  } | null>(null);
 
   const handleOpenAddItem = (project: { id: string; name: string }) => {
     setSelectedProject(project);
@@ -72,13 +85,23 @@ export const ProjectsScreen: React.FC = () => {
                   <Ionicons name="cube-outline" size={20} color={Colors.accentGold} />
                   <Text style={styles.projName}>{proj.name}</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.addItemBtn}
-                  onPress={() => handleOpenAddItem({ id: proj.id, name: proj.name })}
-                >
-                  <Ionicons name="add" size={16} color={Colors.accentGold} />
-                  <Text style={styles.addItemBtnText}>Ítem</Text>
-                </TouchableOpacity>
+                <View style={styles.headerRightActions}>
+                  <TouchableOpacity
+                    style={styles.addItemBtn}
+                    onPress={() => handleOpenAddItem({ id: proj.id, name: proj.name })}
+                  >
+                    <Ionicons name="add" size={16} color={Colors.accentGold} />
+                    <Text style={styles.addItemBtnText}>Ítem</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteProjBtn}
+                    onPress={() =>
+                      setDeleteTarget({ type: 'project', id: proj.id, title: proj.name })
+                    }
+                  >
+                    <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {proj.description ? (
@@ -128,6 +151,15 @@ export const ProjectsScreen: React.FC = () => {
                       </View>
 
                       <Text style={styles.itemAmount}>${item.amount.toFixed(2)}</Text>
+
+                      <TouchableOpacity
+                        style={styles.deleteItemBtn}
+                        onPress={() =>
+                          setDeleteTarget({ type: 'item', id: item.id, title: item.title })
+                        }
+                      >
+                        <Ionicons name="trash-outline" size={15} color={Colors.danger} />
+                      </TouchableOpacity>
                     </View>
                   ))
                 ) : (
@@ -157,6 +189,28 @@ export const ProjectsScreen: React.FC = () => {
           }}
         />
       )}
+
+      {/* Modal Eliminar Proyecto / Ítem con Código Único */}
+      <CreatorCodeModal
+        visible={!!deleteTarget}
+        title={deleteTarget?.type === 'project' ? 'Eliminar Proyecto' : 'Eliminar Ítem'}
+        subtitle={
+          deleteTarget
+            ? `¿Confirmas eliminar "${deleteTarget.title}"? Quedará registrado en la Bitácora de Auditoría BD.`
+            : ''
+        }
+        actionLabel="Confirmar Eliminación"
+        isDestructive
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async (masterCode, reason) => {
+          if (!deleteTarget) return;
+          if (deleteTarget.type === 'project') {
+            await deleteProject(deleteTarget.id, masterCode, reason);
+          } else {
+            await deleteProjectItem(deleteTarget.id, masterCode, reason);
+          }
+        }}
+      />
     </View>
   );
 };
@@ -230,11 +284,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   projName: {
     fontSize: 17,
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   addItemBtn: {
     flexDirection: 'row',
@@ -251,6 +311,11 @@ const styles = StyleSheet.create({
     color: Colors.accentGold,
     fontSize: 11,
     fontWeight: '700',
+  },
+  deleteProjBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(255, 82, 82, 0.1)',
+    borderRadius: 8,
   },
   projDesc: {
     fontSize: 12,
@@ -314,6 +379,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Colors.textPrimary,
+    marginRight: 8,
+  },
+  deleteItemBtn: {
+    padding: 5,
   },
   noItemsText: {
     color: Colors.textMuted,

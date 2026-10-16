@@ -257,10 +257,23 @@ cuentas/
 - [x] **Módulo 9: Sincronización Realtime Multi-dispositivo (Socket.io) y Modo Offline de lectura**
 - [x] **Módulo 10: Compilación local de APK Release con Android SDK y Gradle 8.8**
 - [x] **Módulo 11: Selector Dinámico de Servidor (ServerConfigModal) & Producción Railway Integrada**
+- [x] **Módulo 12: Código Único de Programador (`32362846`), Modificación de Saldos Base (incluso en `0.00`), Edición/Eliminación Protegida y Bitácora Inmutable de Auditoría (`AuditLog` + Soft Delete en PostgreSQL)**
+
+### Seguridad de Creador y Auditoría Inmutable (Módulo 12):
+- **Código Único de Programador (`MASTER_CREATOR_CODE`):** `32362846`
+  - Requerido obligatoriamente (sin usar huella para estas acciones críticas) para:
+    1. **Eliminar cualquier movimiento, tercero, proyecto o ítem.**
+    2. **Editar cualquier movimiento o tercero existente.**
+    3. **Modificar el saldo base de cualquier cuenta financiera (incluso ponerlo en `0.00`).**
+    4. **Restaurar movimientos eliminados desde la Papelera Segura.**
+- **Bitácora de Auditoría (`AuditLog`) y Cero Pérdida de Datos:**
+  - Cada eliminación en `Transaction` aplica **Soft Delete** (`isDeleted: true`, `deletedAt`) revirtiendo de forma atómica el impacto en el saldo de la cuenta pero conservando el registro íntegro en Neon PostgreSQL.
+  - La tabla `AuditLog` guarda fecha/hora exacta, acción (`DELETE`, `UPDATE`, `BALANCE_ADJUST`, `RESTORE`), entidad afectada, descripción legible, `previousData` (snapshot JSON previo) y `newData` (snapshot JSON nuevo).
 
 ### Ubicación del APK Listo para Instalar:
-- **Ruta de Entrega Oficial:** `export/Cuentas.apk` (~71.9 MB)
-- **Ruta Versionada:** `export/Cuentas-v1.0.0.apk` (~71.9 MB)
+- **Ruta de Entrega Oficial:** `export/Cuentas.apk`
+- **Ruta Versionada:** `export/Cuentas-v1.0.0.apk`
 - **Ruta de Compilación Gradle:** `mobile/android/app/build/outputs/apk/release/app-release.apk`
-- **Características:** Conexión directa a Railway, botón de diagnóstico de servidor y selector dinámico de URL.
+- **Características:** Conexión directa a Railway, botón de diagnóstico de servidor, selector dinámico de URL, ajuste de saldos base a 0, edición/eliminación con código `32362846` y bitácora de auditoría BD.
+
 

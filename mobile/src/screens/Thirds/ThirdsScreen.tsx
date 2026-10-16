@@ -11,11 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
 import { NewThirdModal } from './NewThirdModal';
+import { CreatorCodeModal } from '../../components/CreatorCodeModal';
 import { useFinancial } from '../../context/FinancialContext';
 
 export const ThirdsScreen: React.FC = () => {
-  const { thirds, isLoading, refreshAll } = useFinancial();
+  const { thirds, isLoading, refreshAll, deleteThird } = useFinancial();
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingThird, setEditingThird] = useState<any | null>(null);
+  const [deletingThird, setDeletingThird] = useState<any | null>(null);
 
   return (
     <View style={styles.container}>
@@ -37,7 +40,10 @@ export const ThirdsScreen: React.FC = () => {
         {/* Botón Nuevo Tercero */}
         <TouchableOpacity
           style={styles.newThirdBtn}
-          onPress={() => setModalVisible(true)}
+          onPress={() => {
+            setEditingThird(null);
+            setModalVisible(true);
+          }}
           activeOpacity={0.8}
         >
           <Ionicons name="person-add" size={18} color={Colors.bgDark} />
@@ -73,6 +79,9 @@ export const ThirdsScreen: React.FC = () => {
                   </View>
                   <View style={styles.info}>
                     <Text style={styles.name}>{item.name}</Text>
+                    {item.phone ? (
+                      <Text style={styles.phoneText}>{item.phone}</Text>
+                    ) : null}
                     {item.notes ? (
                       <Text style={styles.notes} numberOfLines={1}>
                         {item.notes}
@@ -94,7 +103,9 @@ export const ThirdsScreen: React.FC = () => {
                         },
                       ]}
                     >
-                      {item.netBalance >= 0 ? `+$${item.netBalance.toFixed(2)}` : `-$${Math.abs(item.netBalance).toFixed(2)}`}
+                      {item.netBalance >= 0
+                        ? `+$${item.netBalance.toFixed(2)}`
+                        : `-$${Math.abs(item.netBalance).toFixed(2)}`}
                     </Text>
                   </View>
                 </View>
@@ -125,6 +136,24 @@ export const ThirdsScreen: React.FC = () => {
                       -${item.totalWeOweThem.toFixed(2)}
                     </Text>
                   </View>
+
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => {
+                        setEditingThird(item);
+                        setModalVisible(true);
+                      }}
+                    >
+                      <Ionicons name="create-outline" size={16} color={Colors.accentGold} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => setDeletingThird(item)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </GlassCard>
             );
@@ -132,10 +161,33 @@ export const ThirdsScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* Modal Nuevo Tercero */}
+      {/* Modal Nuevo / Editar Tercero */}
       <NewThirdModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
+        editingThird={editingThird}
+        onClose={() => {
+          setModalVisible(false);
+          setEditingThird(null);
+        }}
+      />
+
+      {/* Modal Eliminar Tercero con Código Único */}
+      <CreatorCodeModal
+        visible={!!deletingThird}
+        title="Eliminar Tercero"
+        subtitle={
+          deletingThird
+            ? `¿Confirmas eliminar a "${deletingThird.name}"? Esta acción quedará registrada en la Bitácora de Auditoría BD.`
+            : ''
+        }
+        actionLabel="Eliminar Tercero"
+        isDestructive
+        onClose={() => setDeletingThird(null)}
+        onConfirm={async (masterCode, reason) => {
+          if (deletingThird) {
+            await deleteThird(deletingThird.id, masterCode, reason);
+          }
+        }}
       />
     </View>
   );
@@ -229,6 +281,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.textPrimary,
   },
+  phoneText: {
+    fontSize: 11,
+    color: Colors.accentGold,
+    marginTop: 1,
+  },
   notes: {
     fontSize: 11,
     color: Colors.textSecondary,
@@ -255,18 +312,29 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   debtItem: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
     alignItems: 'center',
   },
   debtLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSecondary,
   },
   debtValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  iconBtn: {
+    padding: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
   },
 });

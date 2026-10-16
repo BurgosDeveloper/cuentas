@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,128 +16,194 @@ import { CuadreSummaryCard } from '../../components/CuadreSummaryCard';
 import { AccountCard } from '../../components/AccountCard';
 import { FinancialChart } from '../../components/FinancialChart';
 import { TransactionItem } from '../../components/TransactionItem';
+import { NewTransactionModal } from '../Cuadre/NewTransactionModal';
+import { CreatorCodeModal } from '../../components/CreatorCodeModal';
+import { AdjustBalanceModal } from '../Accounts/AdjustBalanceModal';
+import { AuditModal } from '../../components/AuditModal';
 import { useFinancial } from '../../context/FinancialContext';
 import { useAuth } from '../../context/AuthContext';
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { stats, accounts, transactions, isLoading, refreshAll, toggleSettled, isOffline } = useFinancial();
+  const {
+    stats,
+    accounts,
+    transactions,
+    isLoading,
+    refreshAll,
+    toggleSettled,
+    deleteTransaction,
+    isOffline,
+  } = useFinancial();
   const { lock } = useAuth();
 
-  const recentTransactions = transactions.slice(0, 5);
+  const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [deletingTx, setDeletingTx] = useState<any | null>(null);
+  const [adjustingAcc, setAdjustingAcc] = useState<any | null>(null);
+  const [auditVisible, setAuditVisible] = useState(false);
+
+  const recentTransactions = transactions.slice(0, 6);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isLoading}
-          onRefresh={refreshAll}
-          tintColor={Colors.accentGold}
-        />
-      }
-    >
-      {/* Top Header */}
-      <View style={styles.topHeader}>
-        <View style={styles.brandRow}>
-          <Image
-            source={require('../../../assets/logos/logix_diminuto_logo.png')}
-            style={styles.brandLogo}
-            resizeMode="contain"
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={refreshAll}
+            tintColor={Colors.accentGold}
           />
-          <View>
-            <Text style={styles.brandTitle}>CUENTAS</Text>
-            <View style={styles.statusRow}>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: isOffline ? Colors.warning : Colors.success },
-                ]}
-              />
-              <Text style={styles.statusText}>
-                {isOffline ? 'Modo Offline (Lectura)' : '100% Realtime'}
-              </Text>
+        }
+      >
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <View style={styles.brandRow}>
+            <Image
+              source={require('../../../assets/logos/logix_diminuto_logo.png')}
+              style={styles.brandLogo}
+              resizeMode="contain"
+            />
+            <View>
+              <Text style={styles.brandTitle}>CUENTAS</Text>
+              <View style={styles.statusRow}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: isOffline ? Colors.warning : Colors.success },
+                  ]}
+                />
+                <Text style={styles.statusText}>
+                  {isOffline ? 'Modo Offline (Lectura)' : '100% Realtime • Protegido'}
+                </Text>
+              </View>
             </View>
+          </View>
+
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setAuditVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.accentGold} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn} onPress={lock} activeOpacity={0.7}>
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.accentGold} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.lockBtn} onPress={lock} activeOpacity={0.7}>
-          <Ionicons name="lock-closed-outline" size={20} color={Colors.accentGold} />
-        </TouchableOpacity>
-      </View>
+        {/* Estado de Ánimo Financiero */}
+        {stats?.mood && (
+          <MoodBadge
+            status={stats.mood.status}
+            emoji={stats.mood.emoji}
+            icon={stats.mood.icon}
+            color={stats.mood.color}
+            label={stats.mood.label}
+            message={stats.mood.message}
+          />
+        )}
 
-      {/* Estado de Ánimo Financiero */}
-      {stats?.mood && (
-        <MoodBadge
-          status={stats.mood.status}
-          emoji={stats.mood.emoji}
-          icon={stats.mood.icon}
-          color={stats.mood.color}
-          label={stats.mood.label}
-          message={stats.mood.message}
+        {/* Resumen del Cuadre */}
+        <CuadreSummaryCard
+          pendingIncomes={stats?.cuadre?.pendingIncomes || 0}
+          pendingExpenses={stats?.cuadre?.pendingExpenses || 0}
+          cuadreNet={stats?.cuadre?.cuadreNet || 0}
+          pendingCount={stats?.cuadre?.pendingCount || 0}
         />
-      )}
 
-      {/* Resumen del Cuadre */}
-      <CuadreSummaryCard
-        pendingIncomes={stats?.cuadre?.pendingIncomes || 0}
-        pendingExpenses={stats?.cuadre?.pendingExpenses || 0}
-        cuadreNet={stats?.cuadre?.cuadreNet || 0}
-        pendingCount={stats?.cuadre?.pendingCount || 0}
+        {/* Billeteras y Cuentas Principales */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Billeteras & Cuentas (Toca para Ajustar)</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Cuentas')}>
+            <Text style={styles.seeAllText}>Ver todas</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.accountsGrid}>
+          {accounts.map((acc) => (
+            <AccountCard
+              key={acc.id}
+              name={acc.name}
+              currency={acc.currency}
+              balance={acc.balance}
+              color={acc.color}
+              icon={acc.icon}
+              onAdjustPress={() => setAdjustingAcc(acc)}
+              onTransferPress={() => setAdjustingAcc(acc)}
+            />
+          ))}
+        </View>
+
+        {/* Gráfica de Productividad Financiera */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Productividad Financiera</Text>
+        </View>
+        <GlassCard>
+          <FinancialChart data={stats?.chartDaily || []} />
+        </GlassCard>
+
+        {/* Movimientos Recientes */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Últimos Movimientos</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Cuadre')}>
+            <Text style={styles.seeAllText}>Ver Cuadre</Text>
+          </TouchableOpacity>
+        </View>
+
+        {recentTransactions.length === 0 ? (
+          <GlassCard>
+            <Text style={styles.emptyText}>No hay movimientos registrados.</Text>
+          </GlassCard>
+        ) : (
+          recentTransactions.map((tx) => (
+            <TransactionItem
+              key={tx.id}
+              transaction={tx}
+              onToggleSettled={toggleSettled}
+              onEdit={(item) => setEditingTx(item)}
+              onDelete={(item) => setDeletingTx(item)}
+            />
+          ))
+        )}
+      </ScrollView>
+
+      <NewTransactionModal
+        visible={!!editingTx}
+        editingTransaction={editingTx}
+        onClose={() => setEditingTx(null)}
       />
 
-      {/* Billeteras y Cuentas Principales */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Billeteras & Cuentas</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Cuentas')}>
-          <Text style={styles.seeAllText}>Ver todas</Text>
-        </TouchableOpacity>
-      </View>
+      <CreatorCodeModal
+        visible={!!deletingTx}
+        title="Eliminar Movimiento"
+        subtitle={
+          deletingTx
+            ? `Se eliminará "${deletingTx.title}" ($${deletingTx.amountOriginal.toFixed(
+                2
+              )} ${deletingTx.currency}) y quedará respaldado en la Bitácora de Auditoría BD.`
+            : ''
+        }
+        actionLabel="Confirmar Eliminación"
+        isDestructive
+        onClose={() => setDeletingTx(null)}
+        onConfirm={async (masterCode, reason) => {
+          if (deletingTx) {
+            await deleteTransaction(deletingTx.id, masterCode, reason);
+          }
+        }}
+      />
 
-      <View style={styles.accountsGrid}>
-        {accounts.map((acc) => (
-          <AccountCard
-            key={acc.id}
-            name={acc.name}
-            currency={acc.currency}
-            balance={acc.balance}
-            color={acc.color}
-            icon={acc.icon}
-            onTransferPress={() => navigation.navigate('Cuentas')}
-          />
-        ))}
-      </View>
+      <AdjustBalanceModal
+        visible={!!adjustingAcc}
+        account={adjustingAcc}
+        onClose={() => setAdjustingAcc(null)}
+      />
 
-      {/* Gráfica de Productividad Financiera */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Productividad Financiera</Text>
-      </View>
-      <GlassCard>
-        <FinancialChart data={stats?.chartDaily || []} />
-      </GlassCard>
-
-      {/* Movimientos Recientes */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Últimos Movimientos</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Cuadre')}>
-          <Text style={styles.seeAllText}>Ver Cuadre</Text>
-        </TouchableOpacity>
-      </View>
-
-      {recentTransactions.length === 0 ? (
-        <GlassCard>
-          <Text style={styles.emptyText}>No hay movimientos registrados.</Text>
-        </GlassCard>
-      ) : (
-        recentTransactions.map((tx) => (
-          <TransactionItem
-            key={tx.id}
-            transaction={tx}
-            onToggleSettled={toggleSettled}
-          />
-        ))
-      )}
-    </ScrollView>
+      <AuditModal visible={auditVisible} onClose={() => setAuditVisible(false)} />
+    </View>
   );
 };
 
@@ -187,7 +253,12 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: '600',
   },
-  lockBtn: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,

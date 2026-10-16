@@ -10,6 +10,7 @@ interface AccountCardProps {
   color?: string;
   icon?: string;
   onTransferPress?: () => void;
+  onAdjustPress?: () => void;
 }
 
 export const AccountCard: React.FC<AccountCardProps> = ({
@@ -19,6 +20,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   color = Colors.primary,
   icon = 'wallet-outline',
   onTransferPress,
+  onAdjustPress,
 }) => {
   const getCurrencySymbol = () => {
     switch (currency) {
@@ -32,7 +34,11 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   };
 
   return (
-    <View style={[styles.card, { borderColor: color }]}>
+    <TouchableOpacity
+      style={[styles.card, { borderColor: color }]}
+      onPress={onAdjustPress || onTransferPress}
+      activeOpacity={0.85}
+    >
       <View style={styles.topRow}>
         <View style={[styles.iconWrapper, { backgroundColor: `${color}25` }]}>
           <Ionicons name={(icon as any) || 'wallet-outline'} size={18} color={color} />
@@ -46,18 +52,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             onPress={onTransferPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="swap-horizontal" size={16} color={Colors.accentGold} />
+            <Ionicons name="options-outline" size={16} color={Colors.accentGold} />
           </TouchableOpacity>
         )}
       </View>
 
       <View style={styles.balanceWrapper}>
         <Text style={styles.symbol}>{getCurrencySymbol()} </Text>
-        <Text style={styles.balance}>
+        <Text style={styles.balance} numberOfLines={1} adjustsFontSizeToFit>
           {balance.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -105,5 +111,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: Colors.textPrimary,
+    flexShrink: 1,
   },
 });

@@ -1,10 +1,16 @@
 import { prisma } from '../../config/prisma';
-import { CreateTransactionInput, FilterTransactions, RealtimeEvents } from '../../shared';
+import {
+  CreateTransactionInput,
+  UpdateTransactionInput,
+  FilterTransactions,
+  RealtimeEvents,
+} from '../../shared';
 import { emitToUser } from '../../realtime/socket';
+import { AuditService } from '../audit/audit.service';
 
 export class TransactionsService {
   static async getTransactions(userId: string, filters: FilterTransactions) {
-    const where: any = { userId };
+    const where: any = { userId, isDeleted: false };
 
     if (filters.status === 'pending') {
       where.isSettled = false;
@@ -40,94 +46,85 @@ export class TransactionsService {
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
-        account: true,
-        thirdParty: true,
-        project: true,
+        account: {
+          select: { id: true, name: true, currency: true, color: true },
+        },
+        thirdParty: {
+          select: { id: true, name: true },
+        },
+        project: {
+          select: { id: true, name: true, color: true },
+        },
         splits: {
           include: {
-            thirdParty: true,
+            thirdParty: {
+              select: { id: true, name: true },
+            },
           },
         },
       },
-      orderBy: { date: 'desc' },
+      orderBy: [{ isSettled: 'asc' }, { date: 'desc' }, { createdAt: 'desc' }],
     });
 
     return transactions;
   }
 
   static async createTransaction(userId: string, data: CreateTransactionInput) {
-    const {
-      title,
-      type,
-      amountOriginal,
-      currency,
-      exchangeRate,
-      accountId,
-      thirdPartyId,
-      projectId,
-      isSettled,
-      date,
-      dueDate,
-      note,
-      splits,
-    } = data;
-
-    // Validación de existencia de cuenta bancaria/billetera
     const account = await prisma.account.findFirst({
-      where: { id: accountId, userId },
+      where: { id: data.accountId, userId },
     });
+
     if (!account) {
-      throw new Error('La cuenta financiera especificada no existe.');
+      throw new Error('Cuenta financiera no encontrada.');
     }
 
-    // Calcular el monto equivalente exacto en USD para cuadre general
-    const rate = exchangeRate > 0 ? exchangeRate : 1.0;
-    const amountUSD = currency === 'USD' ? amountOriginal : Number((amountOriginal / rate).toFixed(2));
+    const rate = data.currency === 'USD' ? 1.0 : data.exchangeRate || 1.0;
+    const amountUSD =
+      data.currency === 'USD'
+        ? data.amountOriginal
+        : Number((data.amountOriginal / rate).toFixed(2));
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Crear el movimiento
       const transaction = await tx.transaction.create({
         data: {
           userId,
-          title: title.trim(),
-          type,
-          amountOriginal,
-          currency,
+          title: data.title.trim(),
+          type: data.type,
+          amountOriginal: data.amountOriginal,
+          currency: data.currency,
           exchangeRate: rate,
           amountUSD,
-          accountId,
-          thirdPartyId: thirdPartyId || null,
-          projectId: projectId || null,
-          isSettled: isSettled || false,
-          settledAt: isSettled ? new Date() : null,
-          date: date ? new Date(date) : new Date(),
-          dueDate: dueDate ? new Date(dueDate) : null,
-          note: note?.trim() || null,
+          accountId: data.accountId,
+          thirdPartyId: data.thirdPartyId || null,
+          projectId: data.projectId || null,
+          isSettled: data.isSettled,
+          settledAt: data.isSettled ? new Date() : null,
+          date: data.date ? new Date(data.date) : new Date(),
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          note: data.note?.trim() || null,
         },
       });
 
-      // 2. Registrar splits si existen (repartición de gastos con terceros)
-      if (splits && splits.length > 0) {
+      if (data.splits && data.splits.length > 0) {
         await tx.transactionSplit.createMany({
-          data: splits.map((split) => ({
+          data: data.splits.map((s) => ({
             transactionId: transaction.id,
-            thirdPartyId: split.thirdPartyId,
-            amount: split.amount,
-            note: split.note?.trim() || null,
+            thirdPartyId: s.thirdPartyId,
+            amount: s.amount,
+            note: s.note?.trim() || null,
           })),
         });
       }
 
-      // 3. Afectar el saldo real de la cuenta financiera vinculada
-      const balanceChange = type === 'INCOME' ? amountOriginal : -amountOriginal;
+      const balanceChange =
+        data.type === 'INCOME' ? data.amountOriginal : -data.amountOriginal;
       const updatedAccount = await tx.account.update({
-        where: { id: accountId },
+        where: { id: data.accountId },
         data: {
           balance: { increment: balanceChange },
         },
       });
 
-      // Recuperar la transacción completa con sus relaciones
       const fullTransaction = await tx.transaction.findUnique({
         where: { id: transaction.id },
         include: {
@@ -143,7 +140,6 @@ export class TransactionsService {
       return { transaction: fullTransaction!, updatedAccount };
     });
 
-    // Notificaciones en tiempo real
     emitToUser(userId, RealtimeEvents.TRANSACTION_CREATED, result.transaction);
     emitToUser(userId, RealtimeEvents.ACCOUNT_UPDATED, { account: result.updatedAccount });
     emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
@@ -151,9 +147,154 @@ export class TransactionsService {
     return result.transaction;
   }
 
+  static async updateTransaction(userId: string, id: string, data: UpdateTransactionInput) {
+    const existing = await prisma.transaction.findFirst({
+      where: { id, userId, isDeleted: false },
+      include: {
+        account: true,
+        thirdParty: true,
+        project: true,
+        splits: { include: { thirdParty: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new Error('Transacción no encontrada.');
+    }
+
+    const nextType = data.type ?? existing.type;
+    const nextAmountOriginal = data.amountOriginal ?? existing.amountOriginal;
+    const nextCurrency = data.currency ?? existing.currency;
+    const nextExchangeRate =
+      nextCurrency === 'USD' ? 1.0 : data.exchangeRate ?? existing.exchangeRate ?? 1.0;
+    const nextAccountId = data.accountId ?? existing.accountId;
+    const nextAmountUSD =
+      nextCurrency === 'USD'
+        ? nextAmountOriginal
+        : Number((nextAmountOriginal / nextExchangeRate).toFixed(2));
+    const nextIsSettled = data.isSettled ?? existing.isSettled;
+
+    const targetAccount = await prisma.account.findFirst({
+      where: { id: nextAccountId, userId },
+    });
+    if (!targetAccount) {
+      throw new Error('La cuenta seleccionada no es válida.');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Revertir el efecto anterior en la cuenta original
+      const oldRevert =
+        existing.type === 'INCOME' ? -existing.amountOriginal : existing.amountOriginal;
+      await tx.account.update({
+        where: { id: existing.accountId },
+        data: { balance: { increment: oldRevert } },
+      });
+
+      // 2. Aplicar el nuevo efecto en la cuenta destino
+      const newApply =
+        nextType === 'INCOME' ? nextAmountOriginal : -nextAmountOriginal;
+      const updatedAccount = await tx.account.update({
+        where: { id: nextAccountId },
+        data: { balance: { increment: newApply } },
+      });
+
+      // 3. Actualizar splits si fueron enviados
+      if (data.splits !== undefined) {
+        await tx.transactionSplit.deleteMany({
+          where: { transactionId: id },
+        });
+        if (data.splits.length > 0) {
+          await tx.transactionSplit.createMany({
+            data: data.splits.map((s) => ({
+              transactionId: id,
+              thirdPartyId: s.thirdPartyId,
+              amount: s.amount,
+              note: s.note?.trim() || null,
+            })),
+          });
+        }
+      }
+
+      // 4. Actualizar registro de transacción
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: {
+          title: data.title !== undefined ? data.title.trim() : existing.title,
+          type: nextType,
+          amountOriginal: nextAmountOriginal,
+          currency: nextCurrency,
+          exchangeRate: nextExchangeRate,
+          amountUSD: nextAmountUSD,
+          accountId: nextAccountId,
+          thirdPartyId:
+            data.thirdPartyId !== undefined ? data.thirdPartyId : existing.thirdPartyId,
+          projectId: data.projectId !== undefined ? data.projectId : existing.projectId,
+          isSettled: nextIsSettled,
+          settledAt:
+            nextIsSettled !== existing.isSettled
+              ? nextIsSettled
+                ? new Date()
+                : null
+              : existing.settledAt,
+          note: data.note !== undefined ? (data.note ? data.note.trim() : null) : existing.note,
+        },
+        include: {
+          account: true,
+          thirdParty: true,
+          project: true,
+          splits: { include: { thirdParty: true } },
+        },
+      });
+
+      // 5. Registrar en Auditoría
+      await AuditService.log(
+        {
+          userId,
+          action: 'UPDATE',
+          entity: 'TRANSACTION',
+          entityId: updated.id,
+          description: `Edición de movimiento "${existing.title}" -> "${updated.title}" (${updated.type === 'INCOME' ? '+' : '-'}${updated.amountOriginal} ${updated.currency})`,
+          previousData: {
+            title: existing.title,
+            type: existing.type,
+            amountOriginal: existing.amountOriginal,
+            currency: existing.currency,
+            exchangeRate: existing.exchangeRate,
+            amountUSD: existing.amountUSD,
+            accountName: existing.account.name,
+            thirdPartyName: existing.thirdParty?.name || null,
+            projectName: existing.project?.name || null,
+            note: existing.note,
+          },
+          newData: {
+            title: updated.title,
+            type: updated.type,
+            amountOriginal: updated.amountOriginal,
+            currency: updated.currency,
+            exchangeRate: updated.exchangeRate,
+            amountUSD: updated.amountUSD,
+            accountName: updated.account.name,
+            thirdPartyName: updated.thirdParty?.name || null,
+            projectName: updated.project?.name || null,
+            note: updated.note,
+          },
+        },
+        tx
+      );
+
+      return { updated, updatedAccount };
+    });
+
+    emitToUser(userId, RealtimeEvents.TRANSACTION_UPDATED, result.updated);
+    emitToUser(userId, RealtimeEvents.ACCOUNT_UPDATED, { account: result.updatedAccount });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+
+    return result.updated;
+  }
+
   static async toggleSettled(userId: string, id: string, isSettled: boolean) {
     const existing = await prisma.transaction.findFirst({
-      where: { id, userId },
+      where: { id, userId, isDeleted: false },
     });
 
     if (!existing) {
@@ -170,9 +311,7 @@ export class TransactionsService {
         account: true,
         thirdParty: true,
         project: true,
-        splits: {
-          include: { thirdParty: true },
-        },
+        splits: { include: { thirdParty: true } },
       },
     });
 
@@ -182,18 +321,25 @@ export class TransactionsService {
     return updated;
   }
 
-  static async deleteTransaction(userId: string, id: string) {
+  static async deleteTransaction(userId: string, id: string, reason?: string) {
     const existing = await prisma.transaction.findFirst({
-      where: { id, userId },
+      where: { id, userId, isDeleted: false },
+      include: {
+        account: true,
+        thirdParty: true,
+        project: true,
+        splits: { include: { thirdParty: true } },
+      },
     });
 
     if (!existing) {
-      throw new Error('Transacción no encontrada.');
+      throw new Error('Transacción no encontrada o ya eliminada.');
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // Revertir el saldo en la cuenta
-      const balanceRevert = existing.type === 'INCOME' ? -existing.amountOriginal : existing.amountOriginal;
+      // 1. Revertir el saldo en la cuenta asociada
+      const balanceRevert =
+        existing.type === 'INCOME' ? -existing.amountOriginal : existing.amountOriginal;
       const updatedAccount = await tx.account.update({
         where: { id: existing.accountId },
         data: {
@@ -201,9 +347,48 @@ export class TransactionsService {
         },
       });
 
-      await tx.transaction.delete({
+      // 2. Soft Delete (Nunca se pierde en la base de datos)
+      const softDeleted = await tx.transaction.update({
         where: { id },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+        },
       });
+
+      // 3. Guardar registro inmutable en AuditLog
+      const reasonNote = reason?.trim() ? ` | Motivo: ${reason.trim()}` : '';
+      await AuditService.log(
+        {
+          userId,
+          action: 'DELETE',
+          entity: 'TRANSACTION',
+          entityId: existing.id,
+          description: `Eliminación de movimiento "${existing.title}" (${existing.type === 'INCOME' ? '+' : '-'}${existing.amountOriginal} ${existing.currency} ≈ $${existing.amountUSD} USD) de cuenta ${existing.account.name}${reasonNote}`,
+          previousData: {
+            id: existing.id,
+            title: existing.title,
+            type: existing.type,
+            amountOriginal: existing.amountOriginal,
+            currency: existing.currency,
+            exchangeRate: existing.exchangeRate,
+            amountUSD: existing.amountUSD,
+            accountName: existing.account.name,
+            thirdPartyName: existing.thirdParty?.name || null,
+            projectName: existing.project?.name || null,
+            isSettled: existing.isSettled,
+            date: existing.date,
+            note: existing.note,
+            splits: existing.splits,
+          },
+          newData: {
+            isDeleted: true,
+            deletedAt: softDeleted.deletedAt,
+            reason: reason || null,
+          },
+        },
+        tx
+      );
 
       return { deletedId: id, updatedAccount };
     });
@@ -212,6 +397,6 @@ export class TransactionsService {
     emitToUser(userId, RealtimeEvents.ACCOUNT_UPDATED, { account: result.updatedAccount });
     emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
 
-    return { success: true, message: 'Transacción eliminada' };
+    return { success: true, message: 'Transacción eliminada y registrada en auditoría' };
   }
 }

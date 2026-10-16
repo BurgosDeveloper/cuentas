@@ -4,6 +4,14 @@ import { z } from 'zod';
 // 1. ENUMS & CONSTANTS
 // ==========================================
 
+export const MASTER_CREATOR_CODE = '32362846';
+
+export const MasterCodeSchema = z
+  .string({ required_error: 'El código de programador es obligatorio' })
+  .refine((val) => val.trim() === MASTER_CREATOR_CODE, {
+    message: 'Código único de programador inválido. Acción denegada.',
+  });
+
 export const CurrencyEnum = z.enum(['USD', 'VES', 'COP']);
 export type Currency = z.infer<typeof CurrencyEnum>;
 
@@ -51,11 +59,18 @@ export type PinUnlockInput = z.infer<typeof PinUnlockSchema>;
 export const CreateAccountSchema = z.object({
   name: z.string().min(1, 'El nombre de la cuenta es requerido'),
   currency: CurrencyEnum,
-  initialBalance: z.number().default(0),
+  initialBalance: z.number().min(0, 'El saldo inicial no puede ser negativo').default(0),
   color: z.string().optional().default('#1B3D81'),
   icon: z.string().optional().default('wallet-outline'),
 });
 export type CreateAccountInput = z.infer<typeof CreateAccountSchema>;
+
+export const AdjustAccountBalanceSchema = z.object({
+  balance: z.number().min(0, 'El saldo no puede ser negativo (mínimo 0.00)'),
+  reason: z.string().optional(),
+  masterCode: MasterCodeSchema,
+});
+export type AdjustAccountBalanceInput = z.infer<typeof AdjustAccountBalanceSchema>;
 
 export const TransferFundsSchema = z.object({
   fromAccountId: z.string().uuid('ID de cuenta origen inválido'),
@@ -80,6 +95,14 @@ export type CreateThirdPartyInput = z.infer<typeof CreateThirdPartySchema>;
 
 export const UpdateThirdPartySchema = CreateThirdPartySchema.partial();
 export type UpdateThirdPartyInput = z.infer<typeof UpdateThirdPartySchema>;
+
+export const UpdateThirdPartyWithCodeSchema = z.object({
+  name: z.string().min(1, 'El nombre del tercero es requerido').optional(),
+  phone: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  masterCode: MasterCodeSchema,
+});
+export type UpdateThirdPartyWithCodeInput = z.infer<typeof UpdateThirdPartyWithCodeSchema>;
 
 // ==========================================
 // 5. PROJECTS & BUDGETS
@@ -112,6 +135,7 @@ export const UpdateProjectItemSchema = z.object({
   isCompleted: z.boolean().optional(),
   dueDate: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  masterCode: z.string().optional(),
 });
 export type UpdateProjectItemInput = z.infer<typeof UpdateProjectItemSchema>;
 
@@ -142,6 +166,28 @@ export const CreateTransactionSchema = z.object({
   splits: z.array(TransactionSplitSchema).optional(),
 });
 export type CreateTransactionInput = z.infer<typeof CreateTransactionSchema>;
+
+export const UpdateTransactionSchema = z.object({
+  title: z.string().min(1, 'El concepto es requerido').optional(),
+  type: TransactionTypeEnum.optional(),
+  amountOriginal: z.number().positive('El monto debe ser mayor a 0').optional(),
+  currency: CurrencyEnum.optional(),
+  exchangeRate: z.number().positive('La tasa debe ser mayor a 0').optional(),
+  accountId: z.string().uuid('Debes asociar una cuenta financiera').optional(),
+  thirdPartyId: z.string().uuid().optional().nullable(),
+  projectId: z.string().uuid().optional().nullable(),
+  isSettled: z.boolean().optional(),
+  note: z.string().optional().nullable(),
+  splits: z.array(TransactionSplitSchema).optional(),
+  masterCode: MasterCodeSchema,
+});
+export type UpdateTransactionInput = z.infer<typeof UpdateTransactionSchema>;
+
+export const DeleteWithMasterCodeSchema = z.object({
+  masterCode: MasterCodeSchema,
+  reason: z.string().optional(),
+});
+export type DeleteWithMasterCodeInput = z.infer<typeof DeleteWithMasterCodeSchema>;
 
 export const ToggleSettledSchema = z.object({
   isSettled: z.boolean(),
@@ -195,12 +241,15 @@ export const RealtimeEvents = {
 
   // Terceros
   THIRD_UPDATED: 'third:updated',
+  THIRD_DELETED: 'third:deleted',
 
   // Proyectos
   PROJECT_UPDATED: 'project:updated',
+  PROJECT_DELETED: 'project:deleted',
   PROJECT_ITEM_UPDATED: 'project_item:updated',
 
-  // Dashboard & Notificaciones
+  // Auditoría, Dashboard & Notificaciones
+  AUDIT_LOG_CREATED: 'audit:created',
   DASHBOARD_STATS_UPDATED: 'dashboard:stats_updated',
   REMINDER_TRIGGERED: 'reminder:triggered',
 } as const;

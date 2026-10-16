@@ -6,7 +6,7 @@ export class StatsService {
     const [accounts, transactions] = await Promise.all([
       prisma.account.findMany({ where: { userId } }),
       prisma.transaction.findMany({
-        where: { userId },
+        where: { userId, isDeleted: false },
         orderBy: { date: 'asc' },
         include: { thirdParty: true },
       }),

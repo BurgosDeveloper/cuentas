@@ -1,6 +1,12 @@
 import { prisma } from '../../config/prisma';
-import { CreateAccountInput, TransferFundsInput, RealtimeEvents } from '../../shared';
+import {
+  CreateAccountInput,
+  TransferFundsInput,
+  AdjustAccountBalanceInput,
+  RealtimeEvents,
+} from '../../shared';
 import { emitToUser } from '../../realtime/socket';
+import { AuditService } from '../audit/audit.service';
 
 export class AccountsService {
   static async getAccounts(userId: string) {
@@ -9,6 +15,18 @@ export class AccountsService {
       orderBy: { createdAt: 'asc' },
     });
     return accounts;
+  }
+
+  static async getTransfers(userId: string) {
+    return await prisma.accountTransfer.findMany({
+      where: { userId },
+      include: {
+        fromAccount: true,
+        toAccount: true,
+      },
+      orderBy: { date: 'desc' },
+      take: 30,
+    });
   }
 
   static async createAccount(userId: string, data: CreateAccountInput) {
@@ -27,6 +45,81 @@ export class AccountsService {
     emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
 
     return account;
+  }
+
+  static async adjustBalance(userId: string, accountId: string, data: AdjustAccountBalanceInput) {
+    const existing = await prisma.account.findFirst({
+      where: { id: accountId, userId },
+    });
+
+    if (!existing) {
+      throw new Error('Cuenta financiera no encontrada.');
+    }
+
+    const oldBalance = existing.balance;
+    const newBalance = Number(data.balance.toFixed(2));
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const acc = await tx.account.update({
+        where: { id: accountId },
+        data: { balance: newBalance },
+      });
+
+      const reasonNote = data.reason?.trim() ? ` | Motivo: ${data.reason.trim()}` : '';
+      await AuditService.log(
+        {
+          userId,
+          action: 'BALANCE_ADJUST',
+          entity: 'ACCOUNT',
+          entityId: acc.id,
+          description: `Ajuste de saldo base en "${acc.name}": de ${oldBalance.toFixed(2)} ${acc.currency} a ${newBalance.toFixed(2)} ${acc.currency}${reasonNote}`,
+          previousData: { name: existing.name, currency: existing.currency, balance: oldBalance },
+          newData: { name: acc.name, currency: acc.currency, balance: newBalance, reason: data.reason || null },
+        },
+        tx
+      );
+
+      return acc;
+    });
+
+    emitToUser(userId, RealtimeEvents.ACCOUNT_UPDATED, { account: updated, action: 'adjusted' });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+
+    return updated;
+  }
+
+  static async deleteAccount(userId: string, accountId: string, reason?: string) {
+    const existing = await prisma.account.findFirst({
+      where: { id: accountId, userId },
+    });
+
+    if (!existing) {
+      throw new Error('Cuenta financiera no encontrada.');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await AuditService.log(
+        {
+          userId,
+          action: 'DELETE',
+          entity: 'ACCOUNT',
+          entityId: existing.id,
+          description: `Eliminación de cuenta "${existing.name}" (Saldo al eliminar: ${existing.balance} ${existing.currency})`,
+          previousData: existing,
+          newData: { deleted: true, reason: reason || null },
+        },
+        tx
+      );
+
+      await tx.account.delete({
+        where: { id: accountId },
+      });
+    });
+
+    emitToUser(userId, RealtimeEvents.ACCOUNT_UPDATED, { deletedId: accountId, action: 'deleted' });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+
+    return { success: true };
   }
 
   static async transferFunds(userId: string, data: TransferFundsInput) {
