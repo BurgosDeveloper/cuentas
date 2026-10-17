@@ -123,7 +123,16 @@ export class AccountsService {
   }
 
   static async transferFunds(userId: string, data: TransferFundsInput) {
-    const { fromAccountId, toAccountId, amountFrom, exchangeRate, note, date } = data;
+    const {
+      fromAccountId,
+      toAccountId,
+      amountFrom,
+      amountTo,
+      exchangeRate,
+      conversionMode,
+      note,
+      date,
+    } = data;
 
     if (fromAccountId === toAccountId) {
       throw new Error('La cuenta de origen y destino no pueden ser la misma.');
@@ -140,7 +149,32 @@ export class AccountsService {
       throw new Error('Una o ambas cuentas no fueron encontradas.');
     }
 
-    const calculatedAmountTo = Number((amountFrom * exchangeRate).toFixed(2));
+    if (fromAcc.balance < amountFrom) {
+      throw new Error(
+        `Saldo insuficiente en "${fromAcc.name}". Disponible: ${fromAcc.balance.toFixed(2)} ${fromAcc.currency}`
+      );
+    }
+
+    let calculatedAmountTo: number;
+    let effectiveRate = exchangeRate || 1.0;
+
+    if (fromAcc.currency === toAcc.currency) {
+      calculatedAmountTo = Number(amountFrom.toFixed(2));
+      effectiveRate = 1.0;
+    } else if (amountTo !== undefined && amountTo > 0) {
+      calculatedAmountTo = Number(amountTo.toFixed(2));
+    } else if (conversionMode === 'DIVIDE') {
+      calculatedAmountTo = Number((amountFrom / effectiveRate).toFixed(2));
+    } else if (conversionMode === 'MULTIPLY') {
+      calculatedAmountTo = Number((amountFrom * effectiveRate).toFixed(2));
+    } else {
+      // Detección inteligente: si sale de VES o COP hacia USD y la tasa es > 1, se divide
+      if (fromAcc.currency !== 'USD' && toAcc.currency === 'USD' && effectiveRate > 1) {
+        calculatedAmountTo = Number((amountFrom / effectiveRate).toFixed(2));
+      } else {
+        calculatedAmountTo = Number((amountFrom * effectiveRate).toFixed(2));
+      }
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       // 1. Descontar de cuenta origen
@@ -167,7 +201,7 @@ export class AccountsService {
           toAccountId,
           amountFrom,
           amountTo: calculatedAmountTo,
-          exchangeRate,
+          exchangeRate: effectiveRate,
           note: note?.trim() || null,
           date: date ? new Date(date) : new Date(),
         },
@@ -176,6 +210,29 @@ export class AccountsService {
           toAccount: true,
         },
       });
+
+      // 4. Registrar en Bitácora de Auditoría
+      await AuditService.log(
+        {
+          userId,
+          action: 'TRANSFER',
+          entity: 'TRANSFER',
+          entityId: transfer.id,
+          description: `Traspaso de "${fromAcc.name}" (-${amountFrom.toFixed(2)} ${fromAcc.currency}) hacia "${toAcc.name}" (+${calculatedAmountTo.toFixed(2)} ${toAcc.currency})${note?.trim() ? ` | Nota: ${note.trim()}` : ''}`,
+          previousData: {
+            fromAccount: { name: fromAcc.name, balanceBefore: fromAcc.balance },
+            toAccount: { name: toAcc.name, balanceBefore: toAcc.balance },
+          },
+          newData: {
+            fromAccount: { name: fromAcc.name, balanceAfter: updatedFrom.balance },
+            toAccount: { name: toAcc.name, balanceAfter: updatedTo.balance },
+            amountFrom,
+            amountTo: calculatedAmountTo,
+            exchangeRate: effectiveRate,
+          },
+        },
+        tx
+      );
 
       return { transfer, updatedFrom, updatedTo };
     });
@@ -187,4 +244,63 @@ export class AccountsService {
 
     return result;
   }
+
+  static async deleteTransfer(userId: string, transferId: string, reason?: string) {
+    const existing = await prisma.accountTransfer.findFirst({
+      where: { id: transferId, userId },
+      include: {
+        fromAccount: true,
+        toAccount: true,
+      },
+    });
+
+    if (!existing) {
+      throw new Error('Traspaso no encontrado.');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Devolver dinero a la cuenta de origen
+      const updatedFrom = await tx.account.update({
+        where: { id: existing.fromAccountId },
+        data: {
+          balance: { increment: existing.amountFrom },
+        },
+      });
+
+      // 2. Descontar el dinero acreditado en la cuenta destino
+      const updatedTo = await tx.account.update({
+        where: { id: existing.toAccountId },
+        data: {
+          balance: { decrement: existing.amountTo },
+        },
+      });
+
+      // 3. Eliminar comprobante de traspaso
+      await tx.accountTransfer.delete({
+        where: { id: transferId },
+      });
+
+      // 4. Registrar reversión en Auditoría
+      await AuditService.log(
+        {
+          userId,
+          action: 'DELETE',
+          entity: 'TRANSFER',
+          entityId: transferId,
+          description: `Reversión de traspaso: devueltos +${existing.amountFrom.toFixed(2)} ${existing.fromAccount.currency} a "${existing.fromAccount.name}" y descontados -${existing.amountTo.toFixed(2)} ${existing.toAccount.currency} de "${existing.toAccount.name}"${reason ? ` — Motivo: ${reason}` : ''}`,
+          previousData: existing,
+        },
+        tx
+      );
+
+      return { deletedId: transferId, updatedFrom, updatedTo };
+    });
+
+    emitToUser(userId, RealtimeEvents.TRANSFER_DELETED, { id: transferId });
+    emitToUser(userId, RealtimeEvents.ACCOUNT_UPDATED, { accounts: [result.updatedFrom, result.updatedTo] });
+    emitToUser(userId, RealtimeEvents.DASHBOARD_STATS_UPDATED, { timestamp: new Date() });
+
+    return { deleted: true, id: transferId };
+  }
 }
+

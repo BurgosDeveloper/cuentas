@@ -4,12 +4,13 @@ import {
   Text,
   View,
   Image,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { PinPad } from '../../components/PinPad';
+import { ServerConfigModal } from '../../components/ServerConfigModal';
 import { useAuth } from '../../context/AuthContext';
 
 interface PinLockScreenProps {
@@ -20,6 +21,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onSwitchToLogin })
   const { unlockWithPin, unlockWithBiometrics, hasBiometrics } = useAuth();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showServerModal, setShowServerModal] = useState(false);
 
   useEffect(() => {
     // Intentar biometría automáticamente al cargar la pantalla si está disponible
@@ -50,6 +52,14 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onSwitchToLogin })
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.serverFloatingBtn}
+        onPress={() => setShowServerModal(true)}
+      >
+        <Ionicons name="server-outline" size={14} color={Colors.accentGold} />
+        <Text style={styles.serverFloatingText}>Servidor</Text>
+      </TouchableOpacity>
+
       <View style={styles.header}>
         <Image
           source={require('../../../assets/logos/logo_mediano_logix.png')}
@@ -85,6 +95,11 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onSwitchToLogin })
           <Text style={styles.switchButtonText}>Iniciar con Usuario y Clave</Text>
         </TouchableOpacity>
       )}
+
+      <ServerConfigModal
+        visible={showServerModal}
+        onClose={() => setShowServerModal(false)}
+      />
     </View>
   );
 };
@@ -96,6 +111,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+  },
+  serverFloatingBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(27, 61, 129, 0.4)',
+    borderWidth: 1,
+    borderColor: Colors.borderGlass,
+  },
+  serverFloatingText: {
+    color: Colors.accentGold,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   header: {
     alignItems: 'center',

@@ -123,7 +123,9 @@ export declare const TransferFundsSchema: z.ZodObject<{
     fromAccountId: z.ZodString;
     toAccountId: z.ZodString;
     amountFrom: z.ZodNumber;
+    amountTo: z.ZodOptional<z.ZodNumber>;
     exchangeRate: z.ZodDefault<z.ZodNumber>;
+    conversionMode: z.ZodOptional<z.ZodEnum<["MULTIPLY", "DIVIDE", "SAME"]>>;
     note: z.ZodOptional<z.ZodString>;
     date: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
@@ -131,13 +133,17 @@ export declare const TransferFundsSchema: z.ZodObject<{
     toAccountId: string;
     amountFrom: number;
     exchangeRate: number;
+    amountTo?: number | undefined;
+    conversionMode?: "MULTIPLY" | "DIVIDE" | "SAME" | undefined;
     note?: string | undefined;
     date?: string | undefined;
 }, {
     fromAccountId: string;
     toAccountId: string;
     amountFrom: number;
+    amountTo?: number | undefined;
     exchangeRate?: number | undefined;
+    conversionMode?: "MULTIPLY" | "DIVIDE" | "SAME" | undefined;
     note?: string | undefined;
     date?: string | undefined;
 }>;
@@ -481,6 +487,7 @@ export declare const RealtimeEvents: {
     readonly TRANSACTION_SETTLED_TOGGLED: "transaction:settled_toggled";
     readonly ACCOUNT_UPDATED: "account:updated";
     readonly TRANSFER_CREATED: "transfer:created";
+    readonly TRANSFER_DELETED: "transfer:deleted";
     readonly THIRD_UPDATED: "third:updated";
     readonly THIRD_DELETED: "third:deleted";
     readonly PROJECT_UPDATED: "project:updated";

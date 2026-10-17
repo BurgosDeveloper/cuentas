@@ -51,6 +51,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token && status.isBootstrapped) {
         setIsAuthenticated(true);
         setIsLocked(true); // Requiere PIN o biometría para acceder a la vista
+        try {
+          const meRes = await apiRequest<{ id: string; username: string }>('/api/auth/me', {
+            cacheKey: 'auth_me',
+          });
+          if (meRes.data?.id) {
+            setUser({ id: meRes.data.id, username: meRes.data.username });
+          }
+        } catch {
+          // Silencioso si está offline
+        }
       }
     } catch (e) {
       console.warn('Error inicializando estado de autenticación:', e);
@@ -117,9 +127,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (result.success) {
         setIsLocked(false);
-        // Si ya teníamos usuario, conectar socket
-        if (user?.id) {
-          await initSocket(user.id);
+        let activeUserId = user?.id;
+        if (!activeUserId) {
+          try {
+            const meRes = await apiRequest<{ id: string; username: string }>('/api/auth/me', {
+              cacheKey: 'auth_me',
+            });
+            if (meRes.data?.id) {
+              setUser({ id: meRes.data.id, username: meRes.data.username });
+              activeUserId = meRes.data.id;
+            }
+          } catch {
+            // Ignorar en modo offline
+          }
+        }
+        if (activeUserId) {
+          await initSocket(activeUserId);
         }
         return true;
       }

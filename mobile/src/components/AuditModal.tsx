@@ -37,6 +37,8 @@ export const AuditModal: React.FC<AuditModalProps> = ({ visible, onClose }) => {
         return { label: 'EDICIÓN', color: '#38BDF8', icon: 'create-outline' };
       case 'BALANCE_ADJUST':
         return { label: 'AJUSTE SALDO', color: Colors.accentGold, icon: 'options-outline' };
+      case 'TRANSFER':
+        return { label: 'TRASPASO', color: '#A78BFA', icon: 'swap-horizontal-outline' };
       case 'RESTORE':
         return { label: 'RESTAURACIÓN', color: Colors.success, icon: 'refresh-circle-outline' };
       default:

@@ -42,6 +42,10 @@ export const ProjectsScreen: React.FC = () => {
     await updateProjectItem(itemId, { isActive: !currentActive });
   };
 
+  const handleToggleItemCompleted = async (itemId: string, currentCompleted: boolean) => {
+    await updateProjectItem(itemId, { isCompleted: !currentCompleted });
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -134,6 +138,17 @@ export const ProjectsScreen: React.FC = () => {
                     <View key={item.id} style={styles.itemRow}>
                       <TouchableOpacity
                         style={styles.itemActiveToggle}
+                        onPress={() => handleToggleItemCompleted(item.id, !!item.isCompleted)}
+                      >
+                        <Ionicons
+                          name={item.isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={18}
+                          color={item.isCompleted ? Colors.success : Colors.textSecondary}
+                        />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.itemActiveToggle}
                         onPress={() => handleToggleItemActive(item.id, item.isActive)}
                       >
                         <Ionicons
@@ -144,9 +159,23 @@ export const ProjectsScreen: React.FC = () => {
                       </TouchableOpacity>
 
                       <View style={styles.itemTextWrapper}>
-                        <Text style={styles.itemTitle}>{item.title}</Text>
+                        <Text
+                          style={[
+                            styles.itemTitle,
+                            item.isCompleted && {
+                              textDecorationLine: 'line-through',
+                              color: Colors.textSecondary,
+                            },
+                          ]}
+                        >
+                          {item.title}
+                        </Text>
                         <Text style={styles.itemBadge}>
-                          {item.isActive ? 'Activo (En cuentas)' : 'Recordatorio'}
+                          {item.isCompleted
+                            ? 'Completado / Comprado'
+                            : item.isActive
+                            ? 'Activo (En cuentas)'
+                            : 'Recordatorio / Presupuesto'}
                         </Text>
                       </View>
 

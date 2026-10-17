@@ -33,7 +33,7 @@ export const NewProjectItemModal: React.FC<NewProjectItemModalProps> = ({
   const [isActive, setIsActive] = useState(false); // false = recordatorio/presupuesto
 
   const handleSave = async () => {
-    const parsedAmount = parseFloat(amount);
+    const parsedAmount = parseFloat(amount.replace(/,/g, '.'));
     if (!title.trim()) {
       Alert.alert('Validación', 'El título del ítem es requerido.');
       return;

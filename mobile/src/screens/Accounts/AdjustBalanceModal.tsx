@@ -63,9 +63,9 @@ export const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
   };
 
   const handleSave = async () => {
-    const parsedBalance = parseFloat(newBalance);
-    if (isNaN(parsedBalance)) {
-      setError('Ingresa un monto numérico válido (puede ser 0).');
+    const parsedBalance = parseFloat(newBalance.replace(/,/g, '.'));
+    if (isNaN(parsedBalance) || parsedBalance < 0) {
+      setError('Ingresa un monto numérico válido mayor o igual a 0.');
       return;
     }
 

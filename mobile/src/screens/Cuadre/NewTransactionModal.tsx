@@ -92,6 +92,21 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
     if (curr === 'USD') {
       setExchangeRate('1');
     }
+    // Si hay una cuenta con esa moneda, sugerirla automáticamente
+    const matchingAcc = accounts.find((a) => a.currency === curr);
+    if (matchingAcc) {
+      setSelectedAccountId(matchingAcc.id);
+    }
+  };
+
+  const handleSelectAccount = (acc: any) => {
+    setSelectedAccountId(acc.id);
+    if (acc.currency && acc.currency !== currency) {
+      setCurrency(acc.currency);
+      if (acc.currency === 'USD') {
+        setExchangeRate('1');
+      }
+    }
   };
 
   const addSplit = () => {
@@ -108,13 +123,13 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
 
   const updateSplit = (index: number, field: string, value: string) => {
     const updated = [...splits];
-    (updated[index] as any)[field] = value;
+    (updated[index] as any)[field] = field === 'amount' ? value.replace(/,/g, '.') : value;
     setSplits(updated);
   };
 
   const handleSave = async () => {
-    const parsedAmount = parseFloat(amount);
-    const parsedRate = currency === 'USD' ? 1.0 : parseFloat(exchangeRate) || 1.0;
+    const parsedAmount = parseFloat(amount.replace(/,/g, '.'));
+    const parsedRate = currency === 'USD' ? 1.0 : parseFloat(exchangeRate.replace(/,/g, '.')) || 1.0;
 
     if (!title.trim()) {
       Alert.alert('Validación', 'El concepto es obligatorio.');
@@ -291,7 +306,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
                   placeholderTextColor={Colors.textMuted}
                   keyboardType="decimal-pad"
                   value={amount}
-                  onChangeText={setAmount}
+                  onChangeText={(v) => setAmount(v.replace(/,/g, '.'))}
                 />
               </View>
 
@@ -331,7 +346,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
                   placeholderTextColor={Colors.textMuted}
                   keyboardType="decimal-pad"
                   value={exchangeRate}
-                  onChangeText={setExchangeRate}
+                  onChangeText={(v) => setExchangeRate(v.replace(/,/g, '.'))}
                 />
               </View>
             )}
@@ -348,10 +363,12 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
                       (selectedAccountId === acc.id || (!selectedAccountId && acc === accounts[0])) &&
                         styles.accountPillActive,
                     ]}
-                    onPress={() => setSelectedAccountId(acc.id)}
+                    onPress={() => handleSelectAccount(acc)}
                   >
                     <Ionicons name="wallet-outline" size={14} color={Colors.accentGold} />
-                    <Text style={styles.accountPillText}>{acc.name}</Text>
+                    <Text style={styles.accountPillText}>
+                      {acc.name} ({acc.currency})
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>

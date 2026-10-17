@@ -4,8 +4,8 @@ import { emitToUser } from '../../realtime/socket';
 
 export interface CreateAuditLogParams {
   userId: string;
-  action: 'DELETE' | 'UPDATE' | 'BALANCE_ADJUST' | 'RESTORE';
-  entity: 'TRANSACTION' | 'ACCOUNT' | 'THIRD_PARTY' | 'PROJECT' | 'PROJECT_ITEM';
+  action: 'DELETE' | 'UPDATE' | 'BALANCE_ADJUST' | 'RESTORE' | 'TRANSFER';
+  entity: 'TRANSACTION' | 'ACCOUNT' | 'THIRD_PARTY' | 'PROJECT' | 'PROJECT_ITEM' | 'TRANSFER';
   entityId: string;
   description: string;
   previousData?: any;
@@ -74,8 +74,16 @@ export class AuditService {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // Re-aplicar impacto en la cuenta financiera
-      const balanceApply = existing.type === 'INCOME' ? existing.amountOriginal : -existing.amountOriginal;
+      // Re-aplicar impacto en la moneda nativa de la cuenta financiera
+      let nativeAmount = existing.amountOriginal;
+      if (existing.currency !== existing.account.currency) {
+        if (existing.account.currency === 'USD') {
+          nativeAmount = existing.amountUSD;
+        } else if (existing.currency === 'USD') {
+          nativeAmount = Number((existing.amountOriginal * (existing.exchangeRate || 1)).toFixed(2));
+        }
+      }
+      const balanceApply = existing.type === 'INCOME' ? nativeAmount : -nativeAmount;
       const updatedAccount = await tx.account.update({
         where: { id: existing.accountId },
         data: {

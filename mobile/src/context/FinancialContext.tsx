@@ -22,6 +22,7 @@ interface AuditData {
 
 interface FinancialContextType {
   accounts: any[];
+  transfers: any[];
   transactions: any[];
   thirds: any[];
   projects: any[];
@@ -37,6 +38,7 @@ interface FinancialContextType {
   deleteTransaction: (id: string, masterCode: string, reason?: string) => Promise<void>;
   restoreTransaction: (id: string, masterCode: string) => Promise<void>;
   transferFunds: (data: TransferFundsInput) => Promise<void>;
+  deleteTransfer: (transferId: string, masterCode: string, reason?: string) => Promise<void>;
   createAccount: (data: CreateAccountInput) => Promise<void>;
   adjustAccountBalance: (accountId: string, balance: number, masterCode: string, reason?: string) => Promise<void>;
   deleteAccount: (accountId: string, masterCode: string, reason?: string) => Promise<void>;
@@ -55,6 +57,7 @@ const FinancialContext = createContext<FinancialContextType>({} as FinancialCont
 export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLocked } = useAuth();
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [thirds, setThirds] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -83,8 +86,9 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsLoading(true);
 
     try {
-      const [accRes, txRes, thirdRes, projRes, statsRes] = await Promise.all([
+      const [accRes, trfRes, txRes, thirdRes, projRes, statsRes] = await Promise.all([
         apiRequest<any[]>('/api/accounts', { cacheKey: 'accounts' }),
+        apiRequest<any[]>('/api/accounts/transfers', { cacheKey: 'transfers' }),
         apiRequest<any[]>('/api/transactions', { cacheKey: 'transactions' }),
         apiRequest<any[]>('/api/thirds', { cacheKey: 'thirds' }),
         apiRequest<any[]>('/api/projects', { cacheKey: 'projects' }),
@@ -92,6 +96,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ]);
 
       setAccounts(accRes.data || []);
+      setTransfers(trfRes.data || []);
       setTransactions(txRes.data || []);
       setThirds(thirdRes.data || []);
       setProjects(projRes.data || []);
@@ -147,6 +152,9 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       apiRequest<any[]>('/api/accounts', { cacheKey: 'accounts' }).then((res) => {
         setAccounts(res.data);
       });
+      apiRequest<any[]>('/api/accounts/transfers', { cacheKey: 'transfers' }).then((res) => {
+        setTransfers(res.data);
+      });
     };
 
     const handleProjectItemUpdated = () => {
@@ -164,6 +172,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     socket.on(RealtimeEvents.TRANSACTION_UPDATED, handleTransactionUpdated);
     socket.on(RealtimeEvents.TRANSACTION_DELETED, handleTransactionDeleted);
     socket.on(RealtimeEvents.ACCOUNT_UPDATED, handleAccountUpdated);
+    socket.on(RealtimeEvents.TRANSFER_CREATED, handleAccountUpdated);
+    socket.on(RealtimeEvents.TRANSFER_DELETED, handleAccountUpdated);
     socket.on(RealtimeEvents.PROJECT_ITEM_UPDATED, handleProjectItemUpdated);
     socket.on(RealtimeEvents.AUDIT_LOG_CREATED, handleAuditLogCreated);
     socket.on(RealtimeEvents.DASHBOARD_STATS_UPDATED, () => refreshAll());
@@ -174,6 +184,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       socket.off(RealtimeEvents.TRANSACTION_UPDATED, handleTransactionUpdated);
       socket.off(RealtimeEvents.TRANSACTION_DELETED, handleTransactionDeleted);
       socket.off(RealtimeEvents.ACCOUNT_UPDATED, handleAccountUpdated);
+      socket.off(RealtimeEvents.TRANSFER_CREATED, handleAccountUpdated);
+      socket.off(RealtimeEvents.TRANSFER_DELETED, handleAccountUpdated);
       socket.off(RealtimeEvents.PROJECT_ITEM_UPDATED, handleProjectItemUpdated);
       socket.off(RealtimeEvents.AUDIT_LOG_CREATED, handleAuditLogCreated);
       socket.off(RealtimeEvents.DASHBOARD_STATS_UPDATED);
@@ -226,6 +238,14 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const transferFunds = async (data: TransferFundsInput) => {
     await apiRequest('/api/accounts/transfer', { method: 'POST', body: data });
+    await refreshAll();
+  };
+
+  const deleteTransfer = async (transferId: string, masterCode: string, reason?: string) => {
+    await apiRequest(`/api/accounts/transfers/${transferId}`, {
+      method: 'DELETE',
+      body: { masterCode, reason },
+    });
     await refreshAll();
   };
 
@@ -308,6 +328,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     <FinancialContext.Provider
       value={{
         accounts,
+        transfers,
         transactions,
         thirds,
         projects,
@@ -323,6 +344,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         deleteTransaction,
         restoreTransaction,
         transferFunds,
+        deleteTransfer,
         createAccount,
         adjustAccountBalance,
         deleteAccount,

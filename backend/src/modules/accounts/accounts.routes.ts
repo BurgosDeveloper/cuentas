@@ -82,7 +82,8 @@ export const accountsRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = (request.user as any).userId;
     const parsed = TransferFundsSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: 'Datos de traspaso inválidos', details: parsed.error.format() });
+      const firstError = parsed.error.errors[0]?.message || 'Datos de traspaso inválidos';
+      return reply.status(400).send({ error: firstError, details: parsed.error.format() });
     }
 
     try {
@@ -92,4 +93,24 @@ export const accountsRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: err.message });
     }
   });
+
+  fastify.delete('/transfers/:id', async (request, reply) => {
+    const userId = (request.user as any).userId;
+    const { id } = request.params as { id: string };
+    const bodyOrQuery = (request.body && typeof request.body === 'object' ? request.body : request.query) || {};
+    const parsed = DeleteWithMasterCodeSchema.safeParse(bodyOrQuery);
+
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0]?.message || 'Código único de programador requerido';
+      return reply.status(403).send({ error: firstError });
+    }
+
+    try {
+      const result = await AccountsService.deleteTransfer(userId, id, parsed.data.reason);
+      return reply.send(result);
+    } catch (err: any) {
+      return reply.status(400).send({ error: err.message });
+    }
+  });
 };
+

@@ -55,7 +55,9 @@ exports.TransferFundsSchema = zod_1.z.object({
     fromAccountId: zod_1.z.string().uuid('ID de cuenta origen inválido'),
     toAccountId: zod_1.z.string().uuid('ID de cuenta destino inválido'),
     amountFrom: zod_1.z.number().positive('El monto a transferir debe ser mayor a 0'),
+    amountTo: zod_1.z.number().positive('El monto acreditado debe ser mayor a 0').optional(),
     exchangeRate: zod_1.z.number().positive('La tasa de cambio debe ser positiva').default(1.0),
+    conversionMode: zod_1.z.enum(['MULTIPLY', 'DIVIDE', 'SAME']).optional(),
     note: zod_1.z.string().optional(),
     date: zod_1.z.string().optional(),
 });
@@ -181,6 +183,7 @@ exports.RealtimeEvents = {
     // Cuentas y Transferencias
     ACCOUNT_UPDATED: 'account:updated',
     TRANSFER_CREATED: 'transfer:created',
+    TRANSFER_DELETED: 'transfer:deleted',
     // Terceros
     THIRD_UPDATED: 'third:updated',
     THIRD_DELETED: 'third:deleted',

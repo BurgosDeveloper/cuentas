@@ -9,6 +9,25 @@ import { emitToUser } from '../../realtime/socket';
 import { AuditService } from '../audit/audit.service';
 
 export class TransactionsService {
+  private static computeNativeAccountAmount(
+    amountOriginal: number,
+    txCurrency: string,
+    amountUSD: number,
+    exchangeRate: number,
+    accountCurrency: string
+  ): number {
+    if (txCurrency === accountCurrency) {
+      return Number(amountOriginal.toFixed(2));
+    }
+    if (accountCurrency === 'USD') {
+      return Number(amountUSD.toFixed(2));
+    }
+    if (txCurrency === 'USD') {
+      return Number((amountOriginal * (exchangeRate || 1)).toFixed(2));
+    }
+    return Number(amountOriginal.toFixed(2));
+  }
+
   static async getTransactions(userId: string, filters: FilterTransactions) {
     const where: any = { userId, isDeleted: false };
 
@@ -84,6 +103,14 @@ export class TransactionsService {
         ? data.amountOriginal
         : Number((data.amountOriginal / rate).toFixed(2));
 
+    const nativeAmount = this.computeNativeAccountAmount(
+      data.amountOriginal,
+      data.currency,
+      amountUSD,
+      rate,
+      account.currency
+    );
+
     const result = await prisma.$transaction(async (tx) => {
       const transaction = await tx.transaction.create({
         data: {
@@ -116,8 +143,7 @@ export class TransactionsService {
         });
       }
 
-      const balanceChange =
-        data.type === 'INCOME' ? data.amountOriginal : -data.amountOriginal;
+      const balanceChange = data.type === 'INCOME' ? nativeAmount : -nativeAmount;
       const updatedAccount = await tx.account.update({
         where: { id: data.accountId },
         data: {
@@ -181,18 +207,32 @@ export class TransactionsService {
       throw new Error('La cuenta seleccionada no es válida.');
     }
 
+    const oldNativeAmount = this.computeNativeAccountAmount(
+      existing.amountOriginal,
+      existing.currency,
+      existing.amountUSD,
+      existing.exchangeRate,
+      existing.account.currency
+    );
+
+    const newNativeAmount = this.computeNativeAccountAmount(
+      nextAmountOriginal,
+      nextCurrency,
+      nextAmountUSD,
+      nextExchangeRate,
+      targetAccount.currency
+    );
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Revertir el efecto anterior en la cuenta original
-      const oldRevert =
-        existing.type === 'INCOME' ? -existing.amountOriginal : existing.amountOriginal;
+      const oldRevert = existing.type === 'INCOME' ? -oldNativeAmount : oldNativeAmount;
       await tx.account.update({
         where: { id: existing.accountId },
         data: { balance: { increment: oldRevert } },
       });
 
       // 2. Aplicar el nuevo efecto en la cuenta destino
-      const newApply =
-        nextType === 'INCOME' ? nextAmountOriginal : -nextAmountOriginal;
+      const newApply = nextType === 'INCOME' ? newNativeAmount : -newNativeAmount;
       const updatedAccount = await tx.account.update({
         where: { id: nextAccountId },
         data: { balance: { increment: newApply } },
@@ -336,10 +376,17 @@ export class TransactionsService {
       throw new Error('Transacción no encontrada o ya eliminada.');
     }
 
+    const nativeAmount = this.computeNativeAccountAmount(
+      existing.amountOriginal,
+      existing.currency,
+      existing.amountUSD,
+      existing.exchangeRate,
+      existing.account.currency
+    );
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Revertir el saldo en la cuenta asociada
-      const balanceRevert =
-        existing.type === 'INCOME' ? -existing.amountOriginal : existing.amountOriginal;
+      const balanceRevert = existing.type === 'INCOME' ? -nativeAmount : nativeAmount;
       const updatedAccount = await tx.account.update({
         where: { id: existing.accountId },
         data: {
