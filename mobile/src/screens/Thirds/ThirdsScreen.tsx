@@ -12,6 +12,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
+import { ThirdsBalanceChart } from '../../components/AnalyticsCharts';
+import { FadeInSlide } from '../../components/AnimatedWidgets';
 import { NewThirdModal } from './NewThirdModal';
 import { CreatorCodeModal } from '../../components/CreatorCodeModal';
 import { useFinancial } from '../../context/FinancialContext';
@@ -47,6 +49,7 @@ export const ThirdsScreen: React.FC = () => {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -55,25 +58,37 @@ export const ThirdsScreen: React.FC = () => {
           />
         }
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>TERCEROS & DEUDAS</Text>
-          <Text style={styles.headerSubtitle}>
-            Cuentas por Cobrar y Pagar • Toca un tercero para ver su Estado de Cuenta
-          </Text>
-        </View>
+        <FadeInSlide delay={0} distance={12}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>TERCEROS & DEUDAS</Text>
+            <Text style={styles.headerSubtitle}>
+              Cuentas por Cobrar y Pagar • Toca un tercero para ver su Estado de Cuenta
+            </Text>
+          </View>
+        </FadeInSlide>
+
+        {thirds.length > 0 && (
+          <FadeInSlide delay={60} distance={14}>
+            <GlassCard>
+              <ThirdsBalanceChart thirds={thirds} />
+            </GlassCard>
+          </FadeInSlide>
+        )}
 
         {/* Botón Nuevo Tercero */}
-        <TouchableOpacity
-          style={styles.newThirdBtn}
-          onPress={() => {
-            setEditingThird(null);
-            setModalVisible(true);
-          }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="person-add" size={18} color={Colors.bgDark} />
-          <Text style={styles.newThirdBtnText}>+ Agregar Tercero / Contacto</Text>
-        </TouchableOpacity>
+        <FadeInSlide delay={110} distance={16}>
+          <TouchableOpacity
+            style={styles.newThirdBtn}
+            onPress={() => {
+              setEditingThird(null);
+              setModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="person-add" size={18} color={Colors.bgDark} />
+            <Text style={styles.newThirdBtnText}>+ Agregar Tercero / Contacto</Text>
+          </TouchableOpacity>
+        </FadeInSlide>
 
         {/* Listado de Terceros */}
         {thirds.length === 0 ? (

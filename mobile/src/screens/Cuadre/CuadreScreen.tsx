@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,10 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
+import { GlassCard } from '../../components/GlassCard';
 import { CuadreSummaryCard } from '../../components/CuadreSummaryCard';
+import { CashflowAnatomyChart } from '../../components/AnalyticsCharts';
+import { FadeInSlide, ScalePressable } from '../../components/AnimatedWidgets';
 import { TransactionItem } from '../../components/TransactionItem';
 import { NewTransactionModal } from './NewTransactionModal';
 import { CreatorCodeModal } from '../../components/CreatorCodeModal';
@@ -20,16 +24,30 @@ export const CuadreScreen: React.FC = () => {
   const { transactions, stats, isLoading, refreshAll, toggleSettled, deleteTransaction } =
     useFinancial();
   const [filter, setFilter] = useState<'pending' | 'settled' | 'all'>('pending');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAnalytics, setShowAnalytics] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [deletingTx, setDeletingTx] = useState<any | null>(null);
   const [auditModalVisible, setAuditModalVisible] = useState(false);
 
-  const filteredTransactions = transactions.filter((t) => {
-    if (filter === 'pending') return !t.isSettled;
-    if (filter === 'settled') return t.isSettled;
-    return true;
-  });
+  const filteredTransactions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return transactions.filter((t) => {
+      if (filter === 'pending' && t.isSettled) return false;
+      if (filter === 'settled' && !t.isSettled) return false;
+      if (typeFilter !== 'ALL' && t.type !== typeFilter) return false;
+      if (q) {
+        const matchTitle = t.title?.toLowerCase().includes(q);
+        const matchThird = t.thirdParty?.name?.toLowerCase().includes(q);
+        const matchAcc = t.account?.name?.toLowerCase().includes(q);
+        const matchNote = t.note?.toLowerCase().includes(q);
+        return matchTitle || matchThird || matchAcc || matchNote;
+      }
+      return true;
+    });
+  }, [transactions, filter, typeFilter, searchQuery]);
 
   const handleOpenNew = () => {
     setEditingTx(null);
@@ -45,6 +63,7 @@ export const CuadreScreen: React.FC = () => {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -54,116 +73,200 @@ export const CuadreScreen: React.FC = () => {
         }
       >
         {/* Cabecera del Cuadre */}
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>CUADRE DIARIO</Text>
-            <Text style={styles.headerSubtitle}>Control de Flujo, Edición & Auditoría</Text>
+        <FadeInSlide delay={0} distance={12}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.headerTitle}>CUADRE DIARIO</Text>
+              <Text style={styles.headerSubtitle}>Control de Flujo, Edición & Auditoría</Text>
+            </View>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity
+                style={styles.analyticsToggleBtn}
+                onPress={() => setShowAnalytics((v) => !v)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={showAnalytics ? 'pie-chart' : 'pie-chart-outline'}
+                  size={16}
+                  color={Colors.accentGold}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.auditBtn}
+                onPress={() => setAuditModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="shield-checkmark" size={16} color={Colors.accentGold} />
+                <Text style={styles.auditBtnText}>Bitácora</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.auditBtn}
-            onPress={() => setAuditModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="shield-checkmark" size={16} color={Colors.accentGold} />
-            <Text style={styles.auditBtnText}>Bitácora</Text>
-          </TouchableOpacity>
-        </View>
+        </FadeInSlide>
 
         {/* Resumen Superior */}
-        <CuadreSummaryCard
-          pendingIncomes={stats?.cuadre?.pendingIncomes || 0}
-          pendingExpenses={stats?.cuadre?.pendingExpenses || 0}
-          cuadreNet={stats?.cuadre?.cuadreNet || 0}
-          pendingCount={stats?.cuadre?.pendingCount || 0}
-        />
+        <FadeInSlide delay={60} distance={14}>
+          <CuadreSummaryCard
+            pendingIncomes={stats?.cuadre?.pendingIncomes || 0}
+            pendingExpenses={stats?.cuadre?.pendingExpenses || 0}
+            cuadreNet={stats?.cuadre?.cuadreNet || 0}
+            pendingCount={stats?.cuadre?.pendingCount || 0}
+          />
+        </FadeInSlide>
 
-        {/* Filtros Segmentados */}
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, filter === 'pending' && styles.segmentBtnActive]}
-            onPress={() => setFilter('pending')}
-          >
-            <Ionicons
-              name="time-outline"
-              size={14}
-              color={filter === 'pending' ? Colors.bgDark : Colors.textSecondary}
+        {/* Gráfica de Anatomía de Movimientos */}
+        {showAnalytics && transactions.length > 0 && (
+          <FadeInSlide delay={110} distance={16}>
+            <GlassCard>
+              <CashflowAnatomyChart transactions={filteredTransactions.length > 0 ? filteredTransactions : transactions} />
+            </GlassCard>
+          </FadeInSlide>
+        )}
+
+        {/* Buscador Rápido y Filtro por Tipo */}
+        <FadeInSlide delay={150} distance={16}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={17} color={Colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por concepto, tercero, banco..."
+              placeholderTextColor={Colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
-            <Text
-              style={[
-                styles.segmentText,
-                filter === 'pending' && styles.segmentTextActive,
-              ]}
-            >
-              Pendientes ({stats?.cuadre?.pendingCount || 0})
-            </Text>
-          </TouchableOpacity>
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={17} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
 
-          <TouchableOpacity
-            style={[styles.segmentBtn, filter === 'settled' && styles.segmentBtnActive]}
-            onPress={() => setFilter('settled')}
-          >
-            <Ionicons
-              name="checkmark-done"
-              size={14}
-              color={filter === 'settled' ? Colors.bgDark : Colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.segmentText,
-                filter === 'settled' && styles.segmentTextActive,
-              ]}
+          {/* Filtros Segmentados por Estado */}
+          <View style={styles.segmentContainer}>
+            <TouchableOpacity
+              style={[styles.segmentBtn, filter === 'pending' && styles.segmentBtnActive]}
+              onPress={() => setFilter('pending')}
             >
-              Saldados ({stats?.settled?.settledCount || 0})
-            </Text>
-          </TouchableOpacity>
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={filter === 'pending' ? Colors.bgDark : Colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.segmentText,
+                  filter === 'pending' && styles.segmentTextActive,
+                ]}
+              >
+                Pendientes ({stats?.cuadre?.pendingCount || 0})
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.segmentBtn, filter === 'all' && styles.segmentBtnActive]}
-            onPress={() => setFilter('all')}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                filter === 'all' && styles.segmentTextActive,
-              ]}
+            <TouchableOpacity
+              style={[styles.segmentBtn, filter === 'settled' && styles.segmentBtnActive]}
+              onPress={() => setFilter('settled')}
             >
-              Todos ({transactions.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Ionicons
+                name="checkmark-done"
+                size={14}
+                color={filter === 'settled' ? Colors.bgDark : Colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.segmentText,
+                  filter === 'settled' && styles.segmentTextActive,
+                ]}
+              >
+                Saldados ({stats?.settled?.settledCount || 0})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.segmentBtn, filter === 'all' && styles.segmentBtnActive]}
+              onPress={() => setFilter('all')}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  filter === 'all' && styles.segmentTextActive,
+                ]}
+              >
+                Todos ({transactions.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Píldoras de Filtro por Ingreso / Egreso */}
+          <View style={styles.typeFilterRow}>
+            {(['ALL', 'INCOME', 'EXPENSE'] as const).map((t) => {
+              const active = typeFilter === t;
+              const label =
+                t === 'ALL'
+                  ? 'Todos los Tipos'
+                  : t === 'INCOME'
+                  ? 'Solo Ingresos (+)'
+                  : 'Solo Egresos (-)';
+              const activeColor =
+                t === 'INCOME'
+                  ? Colors.success
+                  : t === 'EXPENSE'
+                  ? Colors.danger
+                  : Colors.accentGold;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  style={[
+                    styles.typeChip,
+                    active && {
+                      backgroundColor: `${activeColor}22`,
+                      borderColor: activeColor,
+                    },
+                  ]}
+                  onPress={() => setTypeFilter(t)}
+                >
+                  <Text
+                    style={[
+                      styles.typeChipText,
+                      active && { color: activeColor, fontWeight: '800' },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </FadeInSlide>
 
         {/* Listado de Transacciones */}
-        <View style={styles.listContainer}>
-          {filteredTransactions.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>No hay movimientos en esta sección</Text>
-              <Text style={styles.emptySubtitle}>
-                Presiona el botón dorado (+) para agregar ingresos o egresos al cuadre.
-              </Text>
-            </View>
-          ) : (
-            filteredTransactions.map((tx) => (
-              <TransactionItem
-                key={tx.id}
-                transaction={tx}
-                onToggleSettled={toggleSettled}
-                onEdit={handleOpenEdit}
-                onDelete={(item) => setDeletingTx(item)}
-              />
-            ))
-          )}
-        </View>
+        <FadeInSlide delay={200} distance={18}>
+          <View style={styles.listContainer}>
+            {filteredTransactions.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
+                <Text style={styles.emptyTitle}>No hay movimientos en esta vista</Text>
+                <Text style={styles.emptySubtitle}>
+                  Presiona el botón dorado (+) para agregar ingresos o egresos al cuadre.
+                </Text>
+              </View>
+            ) : (
+              filteredTransactions.map((tx) => (
+                <TransactionItem
+                  key={tx.id}
+                  transaction={tx}
+                  onToggleSettled={toggleSettled}
+                  onEdit={handleOpenEdit}
+                  onDelete={(item) => setDeletingTx(item)}
+                />
+              ))
+            )}
+          </View>
+        </FadeInSlide>
       </ScrollView>
 
-      {/* Botón Flotante Agregar Movimiento (FAB) */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleOpenNew}
-        activeOpacity={0.8}
-      >
+      {/* Botón Flotante Agregar Movimiento (FAB Animado) */}
+      <ScalePressable style={styles.fab} onPress={handleOpenNew} scaleTo={0.9}>
         <Ionicons name="add" size={28} color={Colors.bgDark} />
-      </TouchableOpacity>
+      </ScalePressable>
 
       {/* Modal Nuevo / Editar Movimiento */}
       <NewTransactionModal
@@ -232,6 +335,21 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  analyticsToggleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: 'rgba(27, 61, 129, 0.25)',
+    borderWidth: 1,
+    borderColor: Colors.borderGlass,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   auditBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -248,12 +366,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(13, 19, 34, 0.85)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderGlass,
+    paddingHorizontal: 12,
+    height: 42,
+    marginTop: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 13,
+  },
   segmentContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(27, 61, 129, 0.15)',
     borderRadius: 12,
     padding: 4,
-    marginVertical: 14,
+    marginTop: 10,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.borderGlass,
   },
@@ -277,8 +413,27 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: Colors.bgDark,
   },
+  typeFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  typeChip: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.borderGlass,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+  },
+  typeChipText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
   listContainer: {
-    marginTop: 4,
+    marginTop: 2,
   },
   emptyContainer: {
     padding: 30,

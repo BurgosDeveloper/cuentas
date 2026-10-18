@@ -10,6 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
+import { ProjectsOverviewChart } from '../../components/AnalyticsCharts';
+import { FadeInSlide } from '../../components/AnimatedWidgets';
 import { NewProjectModal } from './NewProjectModal';
 import { NewProjectItemModal } from './NewProjectItemModal';
 import { CreatorCodeModal } from '../../components/CreatorCodeModal';
@@ -50,6 +52,7 @@ export const ProjectsScreen: React.FC = () => {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -58,20 +61,32 @@ export const ProjectsScreen: React.FC = () => {
           />
         }
       >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>PROYECTOS & BIENES</Text>
-          <Text style={styles.headerSubtitle}>Gastos Específicos & Presupuestos</Text>
-        </View>
+        <FadeInSlide delay={0} distance={12}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>PROYECTOS & BIENES</Text>
+            <Text style={styles.headerSubtitle}>Gastos Específicos & Presupuestos</Text>
+          </View>
+        </FadeInSlide>
+
+        {projects.length > 0 && (
+          <FadeInSlide delay={60} distance={14}>
+            <GlassCard>
+              <ProjectsOverviewChart projects={projects} />
+            </GlassCard>
+          </FadeInSlide>
+        )}
 
         {/* Botón Nuevo Proyecto */}
-        <TouchableOpacity
-          style={styles.newProjectBtn}
-          onPress={() => setProjectModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add-circle" size={18} color={Colors.bgDark} />
-          <Text style={styles.newProjectBtnText}>+ Crear Nuevo Proyecto</Text>
-        </TouchableOpacity>
+        <FadeInSlide delay={110} distance={16}>
+          <TouchableOpacity
+            style={styles.newProjectBtn}
+            onPress={() => setProjectModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-circle" size={18} color={Colors.bgDark} />
+            <Text style={styles.newProjectBtnText}>+ Crear Nuevo Proyecto</Text>
+          </TouchableOpacity>
+        </FadeInSlide>
 
         {projects.length === 0 ? (
           <View style={styles.emptyContainer}>

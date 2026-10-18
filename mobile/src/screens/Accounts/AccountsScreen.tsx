@@ -13,6 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../theme/colors';
 import { GlassCard } from '../../components/GlassCard';
+import { PortfolioDistributionChart } from '../../components/AnalyticsCharts';
+import { FadeInSlide } from '../../components/AnimatedWidgets';
 import { TransferModal } from './TransferModal';
 import { AdjustBalanceModal } from './AdjustBalanceModal';
 import { AuditModal } from '../../components/AuditModal';
@@ -67,6 +69,7 @@ export const AccountsScreen: React.FC = () => {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -75,61 +78,71 @@ export const AccountsScreen: React.FC = () => {
           />
         }
       >
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>BILLETERAS & BANCOS</Text>
-            <Text style={styles.headerSubtitle}>Saldos Reales, Traspasos y Arqueo</Text>
+        <FadeInSlide delay={0} distance={12}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.headerTitle}>BILLETERAS & BANCOS</Text>
+              <Text style={styles.headerSubtitle}>Saldos Reales, Traspasos y Arqueo</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.auditBtn}
+              onPress={() => setAuditModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="shield-checkmark" size={16} color={Colors.accentGold} />
+              <Text style={styles.auditBtnText}>Auditoría</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.auditBtn}
-            onPress={() => setAuditModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="shield-checkmark" size={16} color={Colors.accentGold} />
-            <Text style={styles.auditBtnText}>Auditoría</Text>
-          </TouchableOpacity>
-        </View>
+        </FadeInSlide>
 
         {/* Resumen por Monedas */}
-        <GlassCard isGoldHighlighted>
-          <Text style={styles.summaryLabel}>Total Consolidado en Custodia</Text>
-          <View style={styles.currencySummaryRow}>
-            <View style={styles.currencySummaryItem}>
-              <Text style={[styles.currencyAmount, { color: Colors.usd }]}>
-                ${(stats?.wallets?.totalUSD || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-              </Text>
-              <Text style={styles.currencyTag}>USD Dólares</Text>
+        <FadeInSlide delay={60} distance={14}>
+          <GlassCard isGoldHighlighted>
+            <Text style={styles.summaryLabel}>Total Consolidado en Custodia</Text>
+            <View style={styles.currencySummaryRow}>
+              <View style={styles.currencySummaryItem}>
+                <Text style={[styles.currencyAmount, { color: Colors.usd }]}>
+                  ${(stats?.wallets?.totalUSD || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.currencyTag}>USD Dólares</Text>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.currencySummaryItem}>
+                <Text style={[styles.currencyAmount, { color: Colors.ves }]}>
+                  Bs {(stats?.wallets?.totalVES || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                </Text>
+                <Text style={styles.currencyTag}>VES Bolívares</Text>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.currencySummaryItem}>
+                <Text style={[styles.currencyAmount, { color: Colors.cop }]}>
+                  ${(stats?.wallets?.totalCOP || 0).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                </Text>
+                <Text style={styles.currencyTag}>COP Pesos</Text>
+              </View>
             </View>
+          </GlassCard>
 
-            <View style={styles.divider} />
-
-            <View style={styles.currencySummaryItem}>
-              <Text style={[styles.currencyAmount, { color: Colors.ves }]}>
-                Bs {(stats?.wallets?.totalVES || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
-              </Text>
-              <Text style={styles.currencyTag}>VES Bolívares</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.currencySummaryItem}>
-              <Text style={[styles.currencyAmount, { color: Colors.cop }]}>
-                ${(stats?.wallets?.totalCOP || 0).toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-              </Text>
-              <Text style={styles.currencyTag}>COP Pesos</Text>
-            </View>
-          </View>
-        </GlassCard>
+          <GlassCard>
+            <PortfolioDistributionChart accounts={accounts} />
+          </GlassCard>
+        </FadeInSlide>
 
         {/* Botón Acción Rápida: Traspaso */}
-        <TouchableOpacity
-          style={styles.transferActionBtn}
-          onPress={() => setTransferModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="swap-horizontal" size={20} color={Colors.bgDark} />
-          <Text style={styles.transferActionText}>Realizar Traspaso / Cambio de Divisa</Text>
-        </TouchableOpacity>
+        <FadeInSlide delay={120} distance={16}>
+          <TouchableOpacity
+            style={styles.transferActionBtn}
+            onPress={() => setTransferModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="swap-horizontal" size={20} color={Colors.bgDark} />
+            <Text style={styles.transferActionText}>Realizar Traspaso / Cambio de Divisa</Text>
+          </TouchableOpacity>
+        </FadeInSlide>
 
         {/* Lista Detallada de Cuentas */}
         <View style={styles.sectionHeader}>

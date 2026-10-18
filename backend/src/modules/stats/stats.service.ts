@@ -93,19 +93,36 @@ export class StatsService {
       };
     }
 
-    // 5. Datos para Gráficos Financieros
+    // 5. Datos para Gráficos Financieros (Últimos 14 días + ventana mínima garantizada de 7 días calendario)
     const dateMap = new Map<string, { date: string; income: number; expense: number }>();
-    for (const t of transactions.slice(-30)) {
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      dateMap.set(key, { date: key, income: 0, expense: 0 });
+    }
+
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+
+    for (const t of transactions) {
+      if (t.date < thirtyDaysAgo && dateMap.size >= 14) continue;
       const dateKey = t.date.toISOString().split('T')[0];
       if (!dateMap.has(dateKey)) {
         dateMap.set(dateKey, { date: dateKey, income: 0, expense: 0 });
       }
       const entry = dateMap.get(dateKey)!;
-      if (t.type === 'INCOME') entry.income += t.amountUSD;
-      else entry.expense += t.amountUSD;
+      if (t.type === 'INCOME') {
+        entry.income = Number((entry.income + t.amountUSD).toFixed(2));
+      } else {
+        entry.expense = Number((entry.expense + t.amountUSD).toFixed(2));
+      }
     }
 
-    const chartDaily = Array.from(dateMap.values());
+    const chartDaily = Array.from(dateMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
 
     return {
       cuadre: {
